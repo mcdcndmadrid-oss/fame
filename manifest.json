@@ -1,6 +1,7 @@
 {
   "name": "Fame — Menú y compra familiar",
   "short_name": "Fame",
+  "id": "fame",
   "description": "Menú semanal, menú escolar, inventario y lista de la compra de la familia.",
   "lang": "es",
   "start_url": "./",
