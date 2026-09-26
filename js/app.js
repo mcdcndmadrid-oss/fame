@@ -1564,16 +1564,25 @@ async function abrirEscaner() {
     return;
   }
   document.getElementById("barcode-modal").hidden = false;
-  html5QrScanner = new Html5Qrcode("barcode-reader");
+  const F = window.Html5QrcodeSupportedFormats;
+  html5QrScanner = new Html5Qrcode("barcode-reader", {
+    formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128],
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+    verbose: false,
+  });
   try {
     await html5QrScanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: 220 },
+      { fps: 10, qrbox: (ancho, alto) => ({ width: Math.floor(ancho * 0.85), height: Math.floor(Math.min(alto, ancho) * 0.45) }) },
       onBarcodeDetected,
       () => {}
     );
   } catch (err) {
-    showToast("No se pudo acceder a la cámara: " + err.message, "error");
+    const motivo = String(err?.message || err);
+    const texto = /NotAllowed|Permission/i.test(motivo)
+      ? "No hay permiso para usar la cámara. Actívalo en los ajustes del sitio (candado junto a la dirección) y vuelve a intentarlo."
+      : "No se pudo abrir la cámara: " + motivo;
+    showToast(texto, "error");
     await cerrarEscaner();
   }
 }
