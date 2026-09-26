@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fame — Menú Familiar</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-emoji">🍲</span>
+      <div>
+        <h1>Fame</h1>
+        <p class="brand-tagline">Menú y compra familiar</p>
+      </div>
+    </div>
+    <div id="auth-box">
+      <button id="btn-login" class="btn-primary" hidden>Entrar con Google</button>
+      <span id="user-info" class="user-chip" hidden></span>
+      <button id="btn-logout" class="btn-ghost" hidden>Salir</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="hoy">
+      <span class="tab-icon">📅</span><span class="tab-label">Hoy</span>
+    </button>
+    <button class="tab-btn" data-tab="menu">
+      <span class="tab-icon">🗓️</span><span class="tab-label">Menú</span>
+    </button>
+    <button class="tab-btn" data-tab="platos">
+      <span class="tab-icon">📖</span><span class="tab-label">Platos</span>
+    </button>
+    <button class="tab-btn" data-tab="config">
+      <span class="tab-icon">⚙️</span><span class="tab-label">Reglas</span>
+    </button>
+    <button class="tab-btn" data-tab="inventario">
+      <span class="tab-icon">🧊</span><span class="tab-label">Inventario</span>
+    </button>
+    <button class="tab-btn" data-tab="compra">
+      <span class="tab-icon">🛒</span><span class="tab-label">Compra</span>
+    </button>
+  </nav>
+
+  <main id="app-main">
+    <div id="signed-out-msg" class="empty-state" hidden>
+      <span class="empty-emoji">👋</span>
+      <p>Inicia sesión con Google para ver y editar el menú familiar.</p>
+    </div>
+
+    <section id="tab-hoy" class="tab-panel">
+      <div id="hoy-content" class="loading">Cargando…</div>
+    </section>
+
+    <section id="tab-menu" class="tab-panel" hidden>
+      <h2>Menú semanal</h2>
+      <div class="menu-actions">
+        <label>Semana que empieza el
+          <input type="date" id="week-start" />
+        </label>
+        <button id="btn-generar" class="btn-primary">✨ Generar menú</button>
+        <button id="btn-imprimir" type="button" class="btn-ghost">🖨️ Imprimir</button>
+      </div>
+
+      <div id="menu-resumen" class="quota-summary" hidden></div>
+      <div id="menu-avisos" class="banner banner-warning" hidden></div>
+
+      <details id="menu-escolar-box">
+        <summary>Menú escolar de esta semana (opcional)</summary>
+        <p class="hint">Primer plato, segundo y postre del cole cada día. El generador evita repetir en casa las mismas categorías.</p>
+        <p class="hint">Con el PDF del cole se vuelca la semana que elijas automáticamente (revisa y corrige lo que haga falta). Con una foto solo se muestra el texto leído.</p>
+        <input type="file" id="escolar-foto" accept="image/*,application/pdf" hidden />
+        <button type="button" id="btn-importar-foto" class="btn-ghost btn-small">📄 Importar PDF o foto del menú escolar</button>
+        <div id="escolar-pdf-semanas" class="escolar-pdf-semanas" hidden>
+          <select id="escolar-pdf-select"></select>
+          <button type="button" id="btn-volcar-semana" class="btn-primary btn-small">Volcar esta semana</button>
+        </div>
+        <pre id="escolar-ocr-resultado" class="ocr-resultado" hidden></pre>
+        <div id="menu-escolar-grid" class="escolar-lista"></div>
+      </details>
+
+      <div id="menu-grid" class="menu-semana-grid"></div>
+    </section>
+
+    <section id="tab-platos" class="tab-panel" hidden>
+      <h2>Catálogo de platos</h2>
+      <form id="form-plato">
+        <input type="hidden" id="plato-id" />
+        <div class="form-row">
+          <input type="text" id="plato-nombre" placeholder="Nombre del plato" required />
+          <select id="plato-categoria" required>
+            <option value="">Categoría…</option>
+            <option value="legumbre">🫘 Legumbre</option>
+            <option value="pescado">🐟 Pescado</option>
+            <option value="carne">🥩 Carne</option>
+            <option value="pasta">🍝 Pasta</option>
+            <option value="arroz">🍚 Arroz</option>
+            <option value="verdura">🥦 Verdura</option>
+            <option value="huevo">🥚 Huevo</option>
+            <option value="ensalada">🥗 Ensalada</option>
+            <option value="otro">🍽️ Otro</option>
+            <option value="fruta">🍎 Fruta</option>
+            <option value="lacteo">🥛 Lácteo</option>
+            <option value="postre">🍮 Dulce</option>
+          </select>
+          <select id="plato-curso" title="Se sirve como">
+            <option value="primero">Se sirve como: 1º plato</option>
+            <option value="segundo">Se sirve como: 2º plato</option>
+            <option value="postre">Se sirve como: Postre</option>
+          </select>
+          <select id="plato-tiempo">
+            <option value="rapido">⚡ Rápido (&lt; 20 min)</option>
+            <option value="normal" selected>🕐 Normal</option>
+            <option value="largo">🕒 Largo / fin de semana</option>
+          </select>
+        </div>
+
+        <label class="checkbox-inline"><input type="checkbox" id="plato-favorito" /> ⭐ Favorito (el generador lo prioriza un poco)</label>
+
+        <div class="form-group">
+          <label class="form-group-label">Ingredientes</label>
+          <div id="ingredientes-list" class="dynamic-list"></div>
+          <button type="button" id="btn-add-ingrediente" class="btn-ghost btn-small">+ Añadir ingrediente</button>
+          <datalist id="alimentos-conocidos"></datalist>
+        </div>
+
+        <div class="form-group">
+          <label class="form-group-label">Pasos de la receta</label>
+          <div id="pasos-list" class="dynamic-list"></div>
+          <button type="button" id="btn-add-paso" class="btn-ghost btn-small">+ Añadir paso</button>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Guardar plato</button>
+          <button type="button" id="btn-cancelar-edicion" class="btn-ghost" hidden>Cancelar edición</button>
+        </div>
+      </form>
+
+      <div class="platos-toolbar">
+        <input type="search" id="filtro-platos" placeholder="Buscar plato…" />
+      </div>
+      <div id="filtro-categoria-chips" class="filtro-chips"></div>
+      <div id="lista-platos"></div>
+    </section>
+
+    <section id="tab-config" class="tab-panel" hidden>
+      <h2>Restricciones del generador</h2>
+      <form id="form-config">
+        <fieldset>
+          <legend>Reglas por categoría</legend>
+          <p class="hint">Cuántas veces por semana debe (mínimo) o puede como mucho (máximo) aparecer cada categoría. Deja vacío lo que no aplique.</p>
+          <div id="reglas-list" class="dynamic-list"></div>
+          <button type="button" id="btn-add-regla" class="btn-ghost btn-small">+ Añadir regla</button>
+        </fieldset>
+
+        <label>No repetir el mismo plato antes de (semanas)
+          <input type="number" id="cfg-semanas-sin-repetir" min="0" max="12" value="3" />
+        </label>
+
+        <fieldset>
+          <legend>Qué días se come en casa</legend>
+          <table class="dias-tabla" id="dias-especiales-tabla">
+            <thead>
+              <tr><th>Día</th><th>Comida</th><th>Cena</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </fieldset>
+
+        <fieldset>
+          <legend>Qué platos lleva cada comida</legend>
+          <table class="dias-tabla" id="estructura-tabla">
+            <thead>
+              <tr><th></th><th>1º</th><th>2º</th><th>Postre</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>☀️ Comida</td>
+                <td><input type="checkbox" data-comida="comida" data-curso="primero" /></td>
+                <td><input type="checkbox" data-comida="comida" data-curso="segundo" /></td>
+                <td><input type="checkbox" data-comida="comida" data-curso="postre" /></td>
+              </tr>
+              <tr>
+                <td>🌙 Cena</td>
+                <td><input type="checkbox" data-comida="cena" data-curso="primero" /></td>
+                <td><input type="checkbox" data-comida="cena" data-curso="segundo" /></td>
+                <td><input type="checkbox" data-comida="cena" data-curso="postre" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </fieldset>
+
+        <button type="submit" class="btn-primary">Guardar restricciones</button>
+      </form>
+    </section>
+
+    <section id="tab-inventario" class="tab-panel" hidden>
+      <h2>Inventario</h2>
+      <form id="form-inventario">
+        <input type="hidden" id="inv-id" />
+        <input type="hidden" id="inv-codigo" />
+        <div class="form-row">
+          <input type="text" id="inv-nombre" placeholder="Nombre del producto" list="alimentos-conocidos" required />
+          <input type="number" id="inv-cantidad" placeholder="Cantidad" min="0" step="0.1" />
+          <input type="text" id="inv-unidad" placeholder="Unidad (g, ud, botes…)" />
+        </div>
+        <div class="form-row">
+          <select id="inv-ubicacion">
+            <option value="nevera">🧊 Nevera</option>
+            <option value="congelador">🧊❄️ Congelador</option>
+            <option value="despensa">🥫 Despensa</option>
+          </select>
+          <input type="text" id="inv-detalle" placeholder="Dónde exactamente (ej. balda 2, cajón verduras)…" />
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Guardar</button>
+          <button type="button" id="btn-escanear" class="btn-ghost">📷 Escanear código de barras</button>
+          <button type="button" id="btn-cancelar-inventario" class="btn-ghost" hidden>Cancelar edición</button>
+        </div>
+      </form>
+
+      <div class="platos-toolbar">
+        <input type="search" id="filtro-inventario" placeholder="Buscar en el inventario…" />
+      </div>
+      <div id="lista-inventario"></div>
+    </section>
+
+    <section id="tab-compra" class="tab-panel" hidden>
+      <h2>Lista de la compra</h2>
+      <div class="menu-actions">
+        <label>Semana que empieza el
+          <input type="date" id="compra-week-start" />
+        </label>
+        <button id="btn-recalcular-compra" type="button" class="btn-primary">🔄 Recalcular desde el menú</button>
+      </div>
+      <p class="hint">Se calcula sumando los ingredientes de los platos de esa semana y restando lo que ya tienes en el inventario (solo cuando la unidad coincide).</p>
+
+      <form id="form-extra-compra" class="ingrediente-row">
+        <input type="text" id="extra-nombre" placeholder="Añadir algo que no sea del menú…" list="alimentos-conocidos" />
+        <input type="number" id="extra-cantidad" placeholder="Cant." min="0" step="0.1" />
+        <input type="text" id="extra-unidad" placeholder="Unidad" />
+        <button type="submit" class="btn-ghost">+ Añadir</button>
+      </form>
+
+      <div id="lista-compra-contenido"></div>
+    </section>
+  </main>
+
+  <div id="toast-container" aria-live="polite"></div>
+
+  <div id="confirm-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <p id="confirm-modal-message"></p>
+      <div class="modal-actions">
+        <button id="confirm-modal-no" class="btn-ghost">Cancelar</button>
+        <button id="confirm-modal-yes" class="btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="barcode-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <p>Apunta la cámara al código de barras</p>
+      <div id="barcode-reader"></div>
+      <div class="modal-actions">
+        <button id="barcode-cancelar" class="btn-ghost">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

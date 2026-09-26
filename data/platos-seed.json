@@ -1,0 +1,81 @@
+[
+  {
+    "nombre": "Lentejas con verduras",
+    "categoria": "legumbre",
+    "tiempoPrep": "normal",
+    "ingredientes": ["lentejas 400 g", "zanahoria 2", "cebolla 1", "puerro 1", "tomate frito 100 g", "patata 1"],
+    "pasos": [
+      "Sofreír la cebolla, el puerro y la zanahoria picados.",
+      "Añadir el tomate frito y rehogar 2 minutos.",
+      "Incorporar las lentejas, la patata en trozos y cubrir de agua.",
+      "Cocer 30-40 minutos a fuego medio."
+    ]
+  },
+  {
+    "nombre": "Garbanzos con espinacas",
+    "categoria": "legumbre",
+    "tiempoPrep": "normal",
+    "ingredientes": ["garbanzos cocidos 400 g", "espinacas 300 g", "ajo 2 dientes", "pimentón", "comino"],
+    "pasos": [
+      "Sofreír el ajo laminado.",
+      "Añadir las espinacas hasta que reduzcan.",
+      "Incorporar los garbanzos, el pimentón y el comino, saltear 5 minutos."
+    ]
+  },
+  {
+    "nombre": "Merluza a la plancha con patata cocida",
+    "categoria": "pescado",
+    "tiempoPrep": "rapido",
+    "ingredientes": ["merluza 4 lomos", "patata 4", "ajo", "perejil", "aceite de oliva"],
+    "pasos": ["Cocer las patatas.", "Marcar la merluza en la plancha 2-3 min por lado.", "Aliñar con ajo, perejil y aceite."]
+  },
+  {
+    "nombre": "Salmón al horno con verduras",
+    "categoria": "pescado",
+    "tiempoPrep": "normal",
+    "ingredientes": ["salmón 4 lomos", "calabacín 1", "pimiento rojo 1", "cebolla 1", "limón"],
+    "pasos": ["Cortar las verduras y colocar en la bandeja.", "Poner el salmón encima con limón.", "Hornear 20 minutos a 200°C."]
+  },
+  {
+    "nombre": "Pasta con tomate y atún",
+    "categoria": "pasta",
+    "tiempoPrep": "rapido",
+    "ingredientes": ["pasta 400 g", "tomate frito 300 g", "atún en lata 2", "ajo 1 diente"],
+    "pasos": ["Cocer la pasta.", "Calentar el tomate con el ajo y el atún.", "Mezclar todo."]
+  },
+  {
+    "nombre": "Arroz con pollo",
+    "categoria": "arroz",
+    "tiempoPrep": "normal",
+    "ingredientes": ["arroz 350 g", "pollo 4 muslos", "pimiento", "cebolla", "caldo de pollo"],
+    "pasos": ["Dorar el pollo.", "Sofreír la verdura.", "Añadir el arroz y el caldo, cocer 18 minutos."]
+  },
+  {
+    "nombre": "Tortilla de patatas",
+    "categoria": "huevo",
+    "tiempoPrep": "normal",
+    "ingredientes": ["patata 4", "huevo 6", "cebolla 1", "aceite de oliva"],
+    "pasos": ["Freír la patata y la cebolla a fuego suave.", "Mezclar con el huevo batido.", "Cuajar en la sartén por ambos lados."]
+  },
+  {
+    "nombre": "Pollo al horno con verduras",
+    "categoria": "carne",
+    "tiempoPrep": "largo",
+    "ingredientes": ["pollo 1 (troceado)", "patata 4", "cebolla 2", "pimiento", "ajo"],
+    "pasos": ["Colocar todo en la bandeja con aceite y sal.", "Hornear 45-50 minutos a 200°C."]
+  },
+  {
+    "nombre": "Ensalada completa",
+    "categoria": "ensalada",
+    "tiempoPrep": "rapido",
+    "ingredientes": ["lechuga", "tomate", "maíz", "atún o queso", "aceitunas"],
+    "pasos": ["Cortar y mezclar todos los ingredientes.", "Aliñar con aceite, vinagre y sal."]
+  },
+  {
+    "nombre": "Crema de calabacín",
+    "categoria": "verdura",
+    "tiempoPrep": "rapido",
+    "ingredientes": ["calabacín 4", "patata 1", "puerro 1", "queso en porciones (opcional)"],
+    "pasos": ["Cocer todas las verduras.", "Triturar hasta que quede cremoso.", "Añadir el queso si se quiere más suave."]
+  }
+]

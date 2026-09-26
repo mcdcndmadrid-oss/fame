@@ -1,0 +1,610 @@
+:root {
+  --bg: #faf6f0;
+  --ink: #2b2420;
+  --muted: #7a7168;
+  --accent: #c1592a;
+  --accent-dark: #a8481f;
+  --accent-ink: #ffffff;
+  --card: #ffffff;
+  --border: #e8ddd0;
+  --success: #3f7d3a;
+  --success-bg: #e4f5e1;
+  --warning: #9c6a00;
+  --warning-bg: #fdf3d6;
+  --error: #a13d3d;
+  --error-bg: #f8e3e3;
+
+  --cat-legumbre-bg: #f4e3c1; --cat-legumbre-ink: #8a5a00;
+  --cat-pescado-bg: #d7ecf3; --cat-pescado-ink: #1f6f8b;
+  --cat-carne-bg: #f3d7d7; --cat-carne-ink: #a13d3d;
+  --cat-pasta-bg: #fbe8d3; --cat-pasta-ink: #b56a1f;
+  --cat-arroz-bg: #eef0d0; --cat-arroz-ink: #6c7a1f;
+  --cat-verdura-bg: #dcefd7; --cat-verdura-ink: #3f7d3a;
+  --cat-huevo-bg: #fdf3c7; --cat-huevo-ink: #9c7a00;
+  --cat-ensalada-bg: #e4f5e1; --cat-ensalada-ink: #2f7a4f;
+  --cat-otro-bg: #eae5df; --cat-otro-ink: #6b6b6b;
+
+  --radius: 14px;
+  --shadow: 0 2px 10px rgba(43, 36, 32, 0.06);
+  --font-body: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-heading: "Fraunces", Georgia, serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #211c18;
+    --ink: #f2ece4;
+    --muted: #a89d90;
+    --card: #2c2620;
+    --border: #3d352c;
+    --accent: #e07a45;
+    --accent-dark: #c1592a;
+    --success-bg: #23331f;
+    --warning-bg: #362c10;
+    --error-bg: #362121;
+  }
+}
+
+* { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--ink);
+  padding-bottom: 4.5rem;
+}
+
+h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: 700; margin: 0 0 0.5rem; }
+
+/* ---------- Header ---------- */
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.brand { display: flex; align-items: center; gap: 0.6rem; }
+.brand-emoji { font-size: 1.9rem; line-height: 1; }
+.brand h1 { font-size: 1.35rem; margin: 0; }
+.brand-tagline { margin: 0; font-size: 0.78rem; color: var(--muted); }
+
+#auth-box { display: flex; align-items: center; gap: 0.6rem; }
+.user-chip { font-size: 0.85rem; color: var(--muted); }
+
+/* ---------- Buttons ---------- */
+
+button { font-family: inherit; font-size: 0.95rem; cursor: pointer; border-radius: 10px; border: none; }
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 0.6rem 1.1rem;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+.btn-primary:hover { background: var(--accent-dark); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 0.55rem 1rem;
+}
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-small { padding: 0.35rem 0.7rem; font-size: 0.85rem; }
+
+/* ---------- Tabs / navigation ---------- */
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 1.25rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.tab-btn {
+  background: none;
+  padding: 0.5rem 0.9rem;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  border-radius: 8px 8px 0 0;
+}
+
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tab-icon { font-size: 1rem; }
+
+@media (max-width: 640px) {
+  .tabs {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    justify-content: space-between;
+    padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+    z-index: 20;
+    overflow-x: visible;
+  }
+  .tab-btn {
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1;
+    padding: 0.3rem 0.2rem;
+    border-bottom: none;
+    border-radius: 8px;
+  }
+  .tab-btn.active { background: var(--warning-bg); }
+  .tab-label { font-size: 0.68rem; }
+  .tab-icon { font-size: 1.25rem; }
+  body { padding-bottom: 4.75rem; }
+}
+
+/* ---------- Layout ---------- */
+
+main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
+
+.hint { color: var(--muted); font-size: 0.87rem; }
+
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--muted);
+}
+.empty-emoji { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+
+.loading { color: var(--muted); padding: 1rem 0; }
+
+/* ---------- Forms ---------- */
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem;
+  margin-bottom: 1.1rem;
+  box-shadow: var(--shadow);
+}
+
+.form-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.form-row > * { flex: 1; min-width: 150px; }
+.form-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--muted); }
+
+.form-group-label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
+.form-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+.checkbox-inline { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--muted); }
+.checkbox-inline input { width: auto; }
+
+input, select, textarea {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: var(--bg);
+  color: var(--ink);
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+fieldset { border: 1px solid var(--border); border-radius: 10px; }
+legend { padding: 0 0.4rem; color: var(--muted); font-size: 0.85rem; }
+
+details > summary { cursor: pointer; font-weight: 600; margin-bottom: 0.6rem; }
+
+/* ---------- Dynamic ingredient/step lists ---------- */
+
+.dynamic-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.4rem; }
+.dynamic-row { display: flex; gap: 0.4rem; }
+.dynamic-row input { flex: 1; }
+.btn-remove-row {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  width: 2.2rem;
+  flex-shrink: 0;
+}
+.btn-remove-row:hover { color: var(--error); border-color: var(--error); }
+
+/* ---------- Platos toolbar / list ---------- */
+
+.platos-toolbar { display: flex; gap: 0.6rem; margin-bottom: 0.7rem; flex-wrap: wrap; }
+.platos-toolbar input { flex: 1; min-width: 160px; }
+
+.filtro-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.1rem; }
+.chip-filtro {
+  background: var(--card);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.82rem;
+}
+.chip-filtro.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+.platos-seccion { margin-bottom: 1.3rem; }
+.platos-seccion-titulo { font-size: 1rem; font-family: var(--font-body); font-weight: 700; margin-bottom: 0.5rem; }
+
+.platos-lista { list-style: none; padding: 0; margin: 0; }
+
+.platos-lista li {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.55rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: var(--shadow);
+}
+
+.plato-meta { margin-top: 0.15rem; }
+.plato-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.plato-actions button { padding: 0.35rem 0.65rem; font-size: 0.85rem; }
+
+/* ---------- Category badges ---------- */
+
+.cat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.cat-badge[data-cat="legumbre"] { background: var(--cat-legumbre-bg); color: var(--cat-legumbre-ink); }
+.cat-badge[data-cat="pescado"] { background: var(--cat-pescado-bg); color: var(--cat-pescado-ink); }
+.cat-badge[data-cat="carne"] { background: var(--cat-carne-bg); color: var(--cat-carne-ink); }
+.cat-badge[data-cat="pasta"] { background: var(--cat-pasta-bg); color: var(--cat-pasta-ink); }
+.cat-badge[data-cat="arroz"] { background: var(--cat-arroz-bg); color: var(--cat-arroz-ink); }
+.cat-badge[data-cat="verdura"] { background: var(--cat-verdura-bg); color: var(--cat-verdura-ink); }
+.cat-badge[data-cat="huevo"] { background: var(--cat-huevo-bg); color: var(--cat-huevo-ink); }
+.cat-badge[data-cat="ensalada"] { background: var(--cat-ensalada-bg); color: var(--cat-ensalada-ink); }
+.cat-badge[data-cat="otro"] { background: var(--cat-otro-bg); color: var(--cat-otro-ink); }
+
+/* ---------- Menú semanal: una fila por día (cole · comida · cena) ---------- */
+
+:root {
+  --cole: #3b7fb6;
+  --cole-bg: #eaf3fa;
+  --comida: #d98324;
+  --comida-bg: #fff4e5;
+  --cena: #5b5bb5;
+  --cena-bg: #efeefb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cole: #7fb6e0;
+    --cole-bg: #1e2a33;
+    --comida: #f0a34f;
+    --comida-bg: #33271a;
+    --cena: #a3a3ec;
+    --cena-bg: #25243a;
+  }
+}
+
+.menu-semana-grid {
+  display: grid;
+  grid-template-columns: 8rem repeat(3, minmax(0, 1fr));
+  gap: 0.5rem 0.6rem;
+  margin-bottom: 1rem;
+  align-items: stretch;
+}
+
+.menu-cabecera { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 0 0.2rem; }
+.cab-cole { color: var(--cole); }
+.cab-comida { color: var(--comida); }
+.cab-cena { color: var(--cena); }
+
+.menu-dia { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; padding-top: 0.4rem; }
+.menu-dia-nombre { font-weight: 700; font-size: 0.95rem; }
+
+.menu-bloque {
+  min-width: 0;
+  border-radius: var(--radius);
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-left-width: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.bloque-cole { background: var(--cole-bg); border-left-color: var(--cole); border-style: dashed; border-left-style: solid; }
+.bloque-comida { background: var(--comida-bg); border-left-color: var(--comida); }
+.bloque-cena { background: var(--cena-bg); border-left-color: var(--cena); }
+.bloque-fuera { opacity: 0.55; }
+
+.bloque-titulo { margin: 0 0 0.1rem; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.bloque-cole .bloque-titulo { color: var(--cole); }
+.bloque-comida .bloque-titulo { color: var(--comida); }
+.bloque-cena .bloque-titulo { color: var(--cena); }
+
+.plato-linea { display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.86rem; line-height: 1.3; }
+.plato-curso { flex: 0 0 2.9rem; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; padding-top: 0.15rem; }
+.plato-linea-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.plato-icono { margin-right: 0.3rem; }
+.plato-guarnicion { font-size: 0.76rem; color: var(--muted); }
+
+.btn-quitar-plato {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  line-height: 1;
+  padding: 0;
+  border-radius: 999px;
+}
+.btn-quitar-plato:hover { color: var(--error); background: var(--error-bg); }
+
+.select-add-plato,
+.select-intercambiar {
+  width: 100%;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.select-add-plato { font-size: 0.82rem; padding: 0.3rem 0.4rem; }
+.select-intercambiar { font-size: 0.74rem; color: var(--muted); padding: 0.3rem 0.4rem; }
+
+@media (max-width: 760px) {
+  .menu-semana-grid { grid-template-columns: minmax(0, 1fr); }
+  .menu-cabecera { display: none; }
+  .menu-dia { flex-direction: row; align-items: center; gap: 0.6rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+  .menu-dia .select-intercambiar { width: auto; margin-left: auto; }
+}
+
+/* ---------- "Hoy": bloques del día ---------- */
+
+.hoy-bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem; margin-bottom: 1.2rem; }
+.hoy-recetas-titulo { font-size: 1.1rem; margin: 0.5rem 0 0.8rem; }
+
+
+/* ---------- Menú escolar (lista simple por día) ---------- */
+
+.escolar-lista { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+
+.escolar-fila {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+}
+.escolar-dia { font-weight: 700; font-size: 0.9rem; }
+
+.escolar-plato {
+  display: grid;
+  grid-template-columns: 3.4rem 9rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.4rem;
+}
+.escolar-tipo { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.escolar-plato select, .escolar-plato input { min-width: 0; width: 100%; font-size: 0.85rem; padding: 0.4rem 0.5rem; }
+.escolar-guarnicion { grid-column: 3; font-size: 0.8rem !important; }
+
+@media (max-width: 640px) {
+  .escolar-plato { grid-template-columns: 3rem minmax(0, 1fr); }
+  .escolar-plato select { grid-column: 2; }
+  .escolar-plato .escolar-nombre, .escolar-guarnicion { grid-column: 1 / -1; }
+}
+
+.escolar-pdf-semanas { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.6rem 0; }
+.escolar-pdf-semanas select { flex: 1; min-width: 200px; }
+
+
+/* ---------- Tabla de días especiales ---------- */
+
+.dias-tabla { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+.dias-tabla th, .dias-tabla td { text-align: center; padding: 0.5rem; font-size: 0.88rem; }
+.dias-tabla th:first-child, .dias-tabla td:first-child { text-align: left; color: var(--muted); font-weight: 400; }
+.dias-tabla tr:not(:last-child) td, .dias-tabla tr:not(:last-child) th { border-bottom: 1px solid var(--border); }
+.dias-tabla input[type="checkbox"] { width: 1.2rem; height: 1.2rem; }
+
+/* ---------- Reglas por categoría (dinámicas) ---------- */
+
+.regla-row { display: flex; gap: 0.4rem; align-items: center; }
+.regla-row select { flex: 2; min-width: 0; }
+.regla-row input { flex: 1; min-width: 0; }
+
+.ingrediente-row { display: flex; gap: 0.4rem; align-items: center; }
+.ingrediente-row .ing-nombre { flex: 3; min-width: 0; }
+.ingrediente-row .ing-cantidad { flex: 1; min-width: 0; }
+.ingrediente-row .ing-unidad { flex: 1; min-width: 0; }
+
+/* ---------- Menu actions / summary / warnings ---------- */
+
+.menu-actions { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.menu-actions label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--muted); }
+
+.quota-summary { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.quota-pill {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.82rem;
+  box-shadow: var(--shadow);
+}
+
+.banner {
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+}
+.banner-warning { background: var(--warning-bg); color: var(--warning); }
+.banner ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+
+/* ---------- "Hoy" hero ---------- */
+
+.hoy-hero { margin-bottom: 1rem; }
+.hoy-hero .hoy-fecha { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.2rem; }
+.hoy-hero h2 { font-size: 1.6rem; }
+
+.receta-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow);
+}
+.receta-card h3 { font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem; }
+.receta-card .comida-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-family: var(--font-body); font-weight: 600; }
+
+.ingredientes-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0; list-style: none; margin: 0.5rem 0; }
+.ingredientes-chips li {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.receta-pasos { padding-left: 1.2rem; }
+.receta-pasos li { margin-bottom: 0.3rem; }
+
+/* ---------- Toasts ---------- */
+
+#toast-container {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 100;
+  width: min(360px, calc(100% - 2rem));
+}
+
+@media (max-width: 640px) {
+  #toast-container { bottom: 5rem; }
+}
+
+.toast {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast-success { background: var(--success); color: #fff; }
+.toast-error { background: var(--error); color: #fff; }
+
+/* ---------- Confirm modal ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 16, 12, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+
+.modal-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+.modal-card p { margin: 0 0 1rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; }
+
+#barcode-reader { width: 100%; border-radius: 10px; overflow: hidden; }
+#barcode-modal .modal-card { max-width: 420px; }
+
+/* ---------- OCR del menú escolar ---------- */
+
+.ocr-resultado {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem;
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0.6rem 0;
+}
+
+/* ---------- Lista de la compra ---------- */
+
+#form-extra-compra { margin-bottom: 1rem; }
+
+.compra-seccion { margin-bottom: 1.2rem; }
+.compra-seccion-titulo { font-size: 1rem; font-family: var(--font-body); font-weight: 700; margin-bottom: 0.5rem; }
+
+.compra-lista { list-style: none; padding: 0; margin: 0; }
+
+.compra-lista li {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  box-shadow: var(--shadow);
+}
+
+.compra-lista input[type="checkbox"] { width: 1.2rem; height: 1.2rem; flex-shrink: 0; }
+.compra-lista .compra-item-info { flex: 1; min-width: 0; }
+.compra-lista .compra-item-nota { color: var(--muted); font-size: 0.8rem; }
+.compra-lista li.comprado .compra-item-nombre { text-decoration: line-through; color: var(--muted); }
+.compra-lista .btn-remove-row { flex-shrink: 0; }
+
+/* ---------- Impresión ---------- */
+
+@media print {
+  .app-header, .tabs, #toast-container, .menu-actions, #menu-resumen,
+  #menu-avisos, #menu-escolar-box, .select-add-plato, .btn-quitar-plato,
+  .select-intercambiar, #signed-out-msg {
+    display: none !important;
+  }
+  body { padding-bottom: 0; background: #fff; color: #000; }
+  .menu-semana-grid { grid-template-columns: 6rem repeat(3, 1fr) !important; gap: 0.3rem; }
+  .menu-cabecera { display: block !important; }
+  .menu-bloque { break-inside: avoid; padding: 0.35rem 0.5rem; }
+  main { max-width: none; padding: 0; }
+}
