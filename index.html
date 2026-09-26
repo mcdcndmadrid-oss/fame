@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fame — Menú Familiar</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#c1592a" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Fame" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -23,6 +29,7 @@
       </div>
     </div>
     <div id="auth-box">
+      <button id="btn-instalar" class="btn-ghost btn-small" hidden>📲 Instalar</button>
       <button id="btn-login" class="btn-primary" hidden>Entrar con Google</button>
       <span id="user-info" class="user-chip" hidden></span>
       <button id="btn-logout" class="btn-ghost" hidden>Salir</button>
