@@ -7,13 +7,14 @@ import {
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   doc,
   getDoc,
   getDocs,
   setDoc,
-  addDoc,
   deleteDoc,
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
@@ -21,7 +22,30 @@ import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-const db = getFirestore(app);
+// Caché local de los datos: sin conexión se ven los últimos datos cargados y
+// los cambios se guardan y se sincronizan al recuperar la conexión.
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
+
+// Las escrituras se aplican al instante en la caché local y Firestore las
+// sincroniza en cuanto hay conexión. No se espera a la confirmación del
+// servidor (sin cobertura la app se quedaría bloqueada); si el servidor la
+// rechaza, se avisa con el evento "fame:error-guardado".
+function escribir(promesa) {
+  promesa.catch((err) => window.dispatchEvent(new CustomEvent("fame:error-guardado", { detail: err })));
+}
+
+function guardarEnColeccion(nombre, objeto) {
+  const { id, ...data } = objeto;
+  if (id) {
+    escribir(updateDoc(doc(db, nombre, id), data));
+    return id;
+  }
+  const ref = doc(collection(db, nombre)); // id generado en local, sin esperar al servidor
+  escribir(setDoc(ref, data));
+  return ref.id;
+}
 
 export function watchAuth(onChange) {
   return onAuthStateChanged(auth, onChange);
@@ -44,22 +68,16 @@ export async function listarPlatos() {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export async function guardarPlato(plato) {
-  if (plato.id) {
-    const { id, ...data } = plato;
-    await updateDoc(doc(db, "platos", id), data);
-    return id;
-  }
-  const ref = await addDoc(platosCol, plato);
-  return ref.id;
+export async function guardarPlato(objeto) {
+  return guardarEnColeccion("platos", objeto);
 }
 
 export async function borrarPlato(id) {
-  await deleteDoc(doc(db, "platos", id));
+  escribir(deleteDoc(doc(db, "platos", id)));
 }
 
 export async function marcarPlatoUsado(id, fechaISO) {
-  await updateDoc(doc(db, "platos", id), { ultimaVez: fechaISO });
+  escribir(updateDoc(doc(db, "platos", id), { ultimaVez: fechaISO }));
 }
 
 // --- Configuración / restricciones ---
@@ -72,7 +90,7 @@ export async function obtenerRestricciones() {
 }
 
 export async function guardarRestricciones(config) {
-  await setDoc(CONFIG_DOC, config, { merge: true });
+  escribir(setDoc(CONFIG_DOC, config, { merge: true }));
 }
 
 // --- Menús semanales ---
@@ -86,7 +104,7 @@ export async function obtenerMenu(semanaId) {
 // Sin merge: el documento siempre se escribe completo ({ dias, menuEscolar })
 // y así no quedan restos de campos de formatos anteriores dentro de los mapas.
 export async function guardarMenu(semanaId, menu) {
-  await setDoc(doc(db, "menus", semanaId), menu);
+  escribir(setDoc(doc(db, "menus", semanaId), menu));
 }
 
 // --- Inventario ---
@@ -98,18 +116,12 @@ export async function listarInventario() {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export async function guardarItemInventario(item) {
-  if (item.id) {
-    const { id, ...data } = item;
-    await updateDoc(doc(db, "inventario", id), data);
-    return id;
-  }
-  const ref = await addDoc(inventarioCol, item);
-  return ref.id;
+export async function guardarItemInventario(objeto) {
+  return guardarEnColeccion("inventario", objeto);
 }
 
 export async function borrarItemInventario(id) {
-  await deleteDoc(doc(db, "inventario", id));
+  escribir(deleteDoc(doc(db, "inventario", id)));
 }
 
 // --- Alimentos (catálogo canónico de nombres, para no duplicar el mismo
@@ -122,14 +134,8 @@ export async function listarAlimentos() {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export async function guardarAlimento(alimento) {
-  if (alimento.id) {
-    const { id, ...data } = alimento;
-    await updateDoc(doc(db, "alimentos", id), data);
-    return id;
-  }
-  const ref = await addDoc(alimentosCol, alimento);
-  return ref.id;
+export async function guardarAlimento(objeto) {
+  return guardarEnColeccion("alimentos", objeto);
 }
 
 // --- Lista de la compra ---
@@ -142,5 +148,5 @@ export async function obtenerListaCompra(semanaId) {
 }
 
 export async function guardarListaCompra(semanaId, data) {
-  await setDoc(doc(db, "listasCompra", semanaId), data, { merge: true });
+  escribir(setDoc(doc(db, "listasCompra", semanaId), data, { merge: true }));
 }

@@ -1608,6 +1608,32 @@ async function cerrarEscaner() {
   }
 }
 
+// ---------- PWA: service worker e instalación ----------
+
+function initPWA() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch((err) => console.warn("Service worker no registrado:", err));
+  }
+
+  // Chrome/Edge/Android avisan de que la app se puede instalar; en iPhone no
+  // existe este evento y se instala con Compartir → Añadir a pantalla de inicio.
+  const btn = document.getElementById("btn-instalar");
+  let aviso = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    aviso = e;
+    btn.hidden = false;
+  });
+  btn.addEventListener("click", async () => {
+    if (!aviso) return;
+    aviso.prompt();
+    await aviso.userChoice;
+    aviso = null;
+    btn.hidden = true;
+  });
+  window.addEventListener("appinstalled", () => (btn.hidden = true));
+}
+
 // ---------- arranque ----------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1625,6 +1651,11 @@ document.addEventListener("DOMContentLoaded", () => {
   initBarcodeScanner();
   initCompra();
   initEscolarOCR();
+  initPWA();
+  window.addEventListener("fame:error-guardado", (e) => {
+    console.error(e.detail);
+    showToast("No se ha podido guardar un cambio en el servidor: " + (e.detail?.message || e.detail), "error");
+  });
   initAuth();
 });
 
