@@ -68,6 +68,14 @@ El navegador no deja que una web en github.io descargue páginas de otras webs, 
 
 Si publicas la app en otra dirección, añádela a `ORIGENES_PERMITIDOS` en el Worker.
 
+### Reconocer alimentos con foto (Gemini)
+
+El botón «Reconocer con foto» del Inventario usa el mismo Worker, que envía la foto (reducida) a Gemini de Google y devuelve solo la lista de alimentos.
+
+1. En [Google AI Studio](https://aistudio.google.com/apikey) pulsa **Create API key** y cópiala. El nivel gratuito sobra para uso familiar.
+2. En Cloudflare, abre el Worker → **Settings → Variables and Secrets → Add**, tipo **Secret**, nombre `GEMINI_API_KEY`, valor la clave. Guarda.
+3. Opcional: una variable de texto `GEMINI_MODELO` si quieres otro modelo (por defecto `gemini-2.5-flash`).
+
 ## Estructura
 
 ```
