@@ -1642,6 +1642,136 @@ async function importarPDFEscolar(file) {
 
 // ---------- escáner de código de barras ----------
 
+// ---------- reconocer alimentos con foto (Gemini a través del Worker) ----------
+
+function initFotoAlimentos() {
+  const input = document.getElementById("foto-alimento-input");
+  document.getElementById("btn-foto-alimento").addEventListener("click", () => {
+    if (!RECETAS_PROXY_URL) {
+      showToast("Falta configurar el Worker de Cloudflare (js/recetas-config.js).", "error");
+      return;
+    }
+    input.value = "";
+    input.click();
+  });
+  input.addEventListener("change", () => {
+    if (input.files?.[0]) reconocerFoto(input.files[0]);
+  });
+  document.getElementById("foto-cancelar").addEventListener("click", cerrarFotoModal);
+  document.getElementById("foto-guardar").addEventListener("click", guardarAlimentosDeFoto);
+}
+
+function cerrarFotoModal() {
+  document.getElementById("foto-modal").hidden = true;
+  document.getElementById("foto-resultados").innerHTML = "";
+}
+
+// Reduce la foto a 1024 px de lado mayor en JPEG: basta para reconocer y
+// viaja mucho más rápido que la original del móvil.
+async function fotoEnBase64(archivo, lado = 1024) {
+  const bitmap = await createImageBitmap(archivo);
+  const escala = Math.min(1, lado / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * escala);
+  canvas.height = Math.round(bitmap.height * escala);
+  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  return canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
+}
+
+async function reconocerFoto(archivo) {
+  const estado = document.getElementById("foto-estado");
+  const resultados = document.getElementById("foto-resultados");
+  const guardar = document.getElementById("foto-guardar");
+  resultados.innerHTML = "";
+  guardar.disabled = true;
+  document.getElementById("foto-ubicacion-fila").hidden = true;
+  estado.textContent = "Reconociendo alimentos…";
+  document.getElementById("foto-modal").hidden = false;
+
+  let alimentos;
+  try {
+    const imagen = await fotoEnBase64(archivo);
+    const res = await fetch(new URL("reconocer", RECETAS_PROXY_URL), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagen, conocidos: alimentosCache.map((a) => a.nombre) }),
+    });
+    const datos = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(datos.error || `error ${res.status}`);
+    alimentos = datos.alimentos || [];
+  } catch (e) {
+    estado.textContent = `No se ha podido reconocer la foto: ${e.message}`;
+    return;
+  }
+
+  if (!alimentos.length) {
+    estado.textContent = "No he encontrado alimentos en la foto. Prueba con más luz o más cerca.";
+    return;
+  }
+  estado.textContent = "Revisa lo reconocido: corrige lo que haga falta y desmarca lo que no quieras añadir.";
+  resultados.innerHTML = alimentos
+    .map(
+      (a) => `
+      <div class="foto-fila">
+        <input type="checkbox" checked aria-label="Añadir" />
+        <input type="text" class="foto-nombre" list="alimentos-conocidos" value="${escapeHTML(a.nombre)}" />
+        <input type="number" class="foto-cantidad" min="0" step="0.1" placeholder="Cant." value="${a.cantidad ?? ""}" />
+        <input type="text" class="foto-unidad" placeholder="ud" value="${escapeHTML(a.unidad || "")}" />
+      </div>`
+    )
+    .join("");
+  document.getElementById("foto-ubicacion-fila").hidden = false;
+  guardar.disabled = false;
+}
+
+async function guardarAlimentosDeFoto() {
+  const filas = [...document.querySelectorAll("#foto-resultados .foto-fila")]
+    .filter((f) => f.querySelector('input[type="checkbox"]').checked)
+    .map((f) => ({
+      nombre: f.querySelector(".foto-nombre").value.trim(),
+      cantidad: f.querySelector(".foto-cantidad").value ? Number(f.querySelector(".foto-cantidad").value) : null,
+      unidad: f.querySelector(".foto-unidad").value.trim(),
+    }))
+    .filter((f) => f.nombre);
+  const ubicacion = document.getElementById("foto-ubicacion").value;
+  cerrarFotoModal();
+  if (!filas.length) return;
+
+  const nombres = [];
+  for (const fila of filas) {
+    const alimento = await resolverAlimento(fila.nombre);
+    if (!alimento) continue;
+    // Si ya hay ese alimento en el mismo sitio y con la misma unidad, suma la cantidad.
+    const existente = inventarioCache.find(
+      (i) => i.alimentoId === alimento.id && i.ubicacion === ubicacion && (i.unidad || "") === fila.unidad
+    );
+    const item = existente
+      ? {
+          ...existente,
+          cantidad: fila.cantidad == null ? existente.cantidad : (existente.cantidad || 0) + fila.cantidad,
+          actualizado: toISO(new Date()),
+        }
+      : {
+          id: null,
+          alimentoId: alimento.id,
+          nombre: alimento.nombre,
+          cantidad: fila.cantidad,
+          unidad: fila.unidad,
+          ubicacion,
+          detalle: "",
+          codigoBarras: null,
+          actualizado: toISO(new Date()),
+        };
+    await guardarItemInventario(item);
+    nombres.push(alimento.nombre);
+  }
+  inventarioCache = await listarInventario();
+  renderInventarioList();
+  buildAlimentosConocidos();
+  if (nombres.length) showToast(`Añadido al inventario: ${nombres.join(", ")}.`, "success");
+}
+
 function initBarcodeScanner() {
   document.getElementById("btn-escanear").addEventListener("click", abrirEscaner);
   document.getElementById("barcode-cancelar").addEventListener("click", cerrarEscaner);
@@ -1823,6 +1953,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initImprimir();
   initFormInventario();
   initBarcodeScanner();
+  initFotoAlimentos();
   initCompra();
   initEscolarOCR();
   initPWA();
