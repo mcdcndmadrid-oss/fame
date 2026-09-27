@@ -18,7 +18,7 @@ const PALABRAS_CATEGORIA = {
   carne: ["pollo", "ternera", "cerdo", "lomo", "pavo", "carne", "albondiga", "jamon", "muslito", "filete", "picadillo", "salchicha", "hamburguesa", "cinta"],
   huevo: ["huevo", "tortilla", "revuelto"],
   pasta: ["pasta", "macarron", "espagueti", "canelon", "lasagna", "lasana", "raviol", "fideo", "estrellitas", "tallarin"],
-  arroz: ["arroz", "paella"],
+  arroz: ["arroz", "paella", "risotto", "rissotto"],
   ensalada: ["ensalada"],
   verdura: ["verdura", "judias verdes", "judia verde", "guisante", "coliflor", "brocoli", "espinaca", "calabacin", "repollo", "zanahoria", "acelga", "menestra", "puerro", "berenjena", "vegetal", "crema", "pure", "patata", "gazpacho", "salmorejo"],
 };
