@@ -57,15 +57,33 @@ importarSeed()
 
 Esto carga en Firestore los platos de [`data/platos-seed.json`](data/platos-seed.json) para no partir del catálogo vacío. Es un helper de un solo uso, pensado solo para el arranque inicial.
 
+## 5. Importar recetas de webs (intermediario en Cloudflare)
+
+El navegador no deja que una web en github.io descargue páginas de otras webs, así que la importación por enlace pasa por un pequeño intermediario gratuito en Cloudflare Workers. Solo devuelve los datos de la receta y solo atiende a esta app. Sin él sigue funcionando «Pegar texto».
+
+1. Crea una cuenta gratuita en https://dash.cloudflare.com/sign-up.
+2. **Workers & Pages → Create → Create Worker**, ponle un nombre (p. ej. `fame-recetas`) y pulsa **Deploy**.
+3. **Edit code**: borra el contenido, pega el de [`cloudflare/recetas-worker.js`](cloudflare/recetas-worker.js) y pulsa **Deploy**.
+4. Copia la dirección del Worker (`https://fame-recetas.TU-SUBDOMINIO.workers.dev`) en [`js/recetas-config.js`](js/recetas-config.js) y sube ese archivo.
+
+Si publicas la app en otra dirección, añádela a `ORIGENES_PERMITIDOS` en el Worker.
+
 ## Estructura
 
 ```
 index.html          Shell de la app y navegación por pestañas
+manifest.json       Manifiesto PWA (nombre, iconos, colores) para instalarla en el móvil
+sw.js               Service worker (primero red; copia offline de la app)
+icons/              Iconos PNG de la app instalada
 css/style.css        Estilos
 js/firebase-config.js  Config de tu proyecto Firebase (rellenar)
 js/db.js             Acceso a Firestore (platos, restricciones, menús)
 js/generator.js       Algoritmo del generador de menú (puro, sin Firebase)
 js/escolar-pdf.js     Lectura del menú escolar en PDF (semanas, 1º/2º/postre, categorías)
+js/compra.js          Lista de la compra: agrupar por alimento, sumar unidades, secciones
+js/recetas.js         Convertir recetas de webs o texto pegado en platos
+js/recetas-config.js  Dirección del intermediario de Cloudflare
+cloudflare/           Código del intermediario (se pega en Cloudflare, no se publica)
 js/app.js             Lógica de UI y pegamento entre módulos
 data/platos-seed.json  Ejemplo de catálogo inicial para importar
 ```

@@ -69,10 +69,16 @@
 
     <section id="tab-menu" class="tab-panel" hidden>
       <h2>Menú semanal</h2>
+      <div class="semana-nav">
+        <button type="button" class="btn-ghost btn-small" data-mover="-1" title="Semana anterior">◀</button>
+        <div class="semana-nav-centro">
+          <span class="semana-etiqueta"></span>
+          <input type="date" id="week-start" title="Ir a la semana de esta fecha" />
+        </div>
+        <button type="button" class="btn-ghost btn-small" data-mover="1" title="Semana siguiente">▶</button>
+        <button type="button" class="btn-ghost btn-small" data-mover="0">Esta semana</button>
+      </div>
       <div class="menu-actions">
-        <label>Semana que empieza el
-          <input type="date" id="week-start" />
-        </label>
         <button id="btn-generar" class="btn-primary">✨ Generar menú</button>
         <button id="btn-imprimir" type="button" class="btn-ghost">🖨️ Imprimir</button>
       </div>
@@ -83,13 +89,9 @@
       <details id="menu-escolar-box">
         <summary>Menú escolar de esta semana (opcional)</summary>
         <p class="hint">Primer plato, segundo y postre del cole cada día. El generador evita repetir en casa las mismas categorías.</p>
-        <p class="hint">Con el PDF del cole se vuelca la semana que elijas automáticamente (revisa y corrige lo que haga falta). Con una foto solo se muestra el texto leído.</p>
+        <p class="hint">Con el PDF del cole se guardan de golpe todas las semanas que traiga (normalmente el mes entero); luego te mueves entre semanas con ◀ ▶. Revisa y corrige lo que haga falta. Con una foto solo se muestra el texto leído.</p>
         <input type="file" id="escolar-foto" accept="image/*,application/pdf" hidden />
         <button type="button" id="btn-importar-foto" class="btn-ghost btn-small">📄 Importar PDF o foto del menú escolar</button>
-        <div id="escolar-pdf-semanas" class="escolar-pdf-semanas" hidden>
-          <select id="escolar-pdf-select"></select>
-          <button type="button" id="btn-volcar-semana" class="btn-primary btn-small">Volcar esta semana</button>
-        </div>
         <pre id="escolar-ocr-resultado" class="ocr-resultado" hidden></pre>
         <div id="menu-escolar-grid" class="escolar-lista"></div>
       </details>
@@ -99,8 +101,19 @@
 
     <section id="tab-platos" class="tab-panel" hidden>
       <h2>Catálogo de platos</h2>
+      <details id="importar-receta" class="importar-receta">
+        <summary>🌐 Importar receta de una web o pegando el texto</summary>
+        <div class="importar-fila">
+          <input type="url" id="importar-url" placeholder="Enlace de la receta (Directo al Paladar, recetasgratis…)" />
+          <button type="button" id="btn-importar-url" class="btn-primary btn-small">Importar</button>
+        </div>
+        <p class="hint">Desde el móvil también puedes, en la página de la receta, pulsar Compartir → Fame. Si una web no se deja, copia el texto de la receta (título, ingredientes y pasos) y pégalo aquí:</p>
+        <textarea id="importar-texto" rows="6" placeholder="Lentejas estofadas&#10;Ingredientes&#10;- 400 g de lentejas&#10;- 2 dientes de ajo&#10;Preparación&#10;1. Picamos el ajo…"></textarea>
+        <button type="button" id="btn-importar-texto" class="btn-ghost btn-small">Procesar texto</button>
+      </details>
       <form id="form-plato">
         <input type="hidden" id="plato-id" />
+        <input type="hidden" id="plato-fuente" />
         <div class="form-row">
           <input type="text" id="plato-nombre" placeholder="Nombre del plato" required />
           <select id="plato-categoria" required>
@@ -242,13 +255,19 @@
 
     <section id="tab-compra" class="tab-panel" hidden>
       <h2>Lista de la compra</h2>
+      <div class="semana-nav">
+        <button type="button" class="btn-ghost btn-small" data-mover="-1" title="Semana anterior">◀</button>
+        <div class="semana-nav-centro">
+          <span class="semana-etiqueta"></span>
+          <input type="date" id="compra-week-start" title="Ir a la semana de esta fecha" />
+        </div>
+        <button type="button" class="btn-ghost btn-small" data-mover="1" title="Semana siguiente">▶</button>
+        <button type="button" class="btn-ghost btn-small" data-mover="0">Esta semana</button>
+      </div>
       <div class="menu-actions">
-        <label>Semana que empieza el
-          <input type="date" id="compra-week-start" />
-        </label>
         <button id="btn-recalcular-compra" type="button" class="btn-primary">🔄 Recalcular desde el menú</button>
       </div>
-      <p class="hint">Se calcula sumando los ingredientes de los platos de esa semana y restando lo que ya tienes en el inventario (solo cuando la unidad coincide).</p>
+      <p class="hint">Suma los ingredientes de los platos de la semana (un mismo alimento sale una sola vez aunque aparezca en varios platos o escrito distinto) y resta lo que ya tienes en el inventario. Agrupada por secciones del súper; si algo está en la sección equivocada, cámbialo con su desplegable y lo recordará.</p>
 
       <form id="form-extra-compra" class="ingrediente-row">
         <input type="text" id="extra-nombre" placeholder="Añadir algo que no sea del menú…" list="alimentos-conocidos" />
