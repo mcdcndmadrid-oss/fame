@@ -876,6 +876,19 @@ details[open] > summary::after { transform: rotate(-135deg); }
 #barcode-reader { width: 100%; border-radius: var(--radius-sm); overflow: hidden; }
 #barcode-modal .modal-card { max-width: 440px; }
 
+/* ---------- Reconocer alimentos con foto ---------- */
+#foto-modal .modal-card { max-width: 480px; max-height: 90vh; overflow-y: auto; }
+.modal-titulo { margin: 0 0 0.3rem; font-size: 1.1rem; }
+.foto-resultados { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+.foto-fila { display: flex; align-items: center; gap: 0.4rem; }
+.foto-fila input[type="checkbox"] { flex: 0 0 auto; width: 1.2rem; height: 1.2rem; accent-color: var(--accent); }
+.foto-fila .foto-nombre { flex: 1; min-width: 0; }
+.foto-fila .foto-cantidad { flex: 0 0 4.6rem; min-width: 0; text-align: center; padding-inline: 0.3rem; }
+.foto-fila .foto-unidad { flex: 0 0 3.4rem; min-width: 0; text-align: center; padding-inline: 0.3rem; }
+.foto-fila:has(input[type="checkbox"]:not(:checked)) input:not([type="checkbox"]) { opacity: 0.45; }
+.foto-ubicacion { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; color: var(--muted); font-size: 0.9rem; }
+.foto-ubicacion select { flex: 1; }
+
 /* ---------- Impresión ---------- */
 
 @media print {
