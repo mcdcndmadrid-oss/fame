@@ -36,6 +36,9 @@ import {
   categorizarPlato,
   categorizarPostre,
 } from "./escolar-pdf.js";
+import { SECCIONES, agruparCompra, formatearCantidades } from "./compra.js";
+import { desdeSchemaOrg, desdeTexto } from "./recetas.js";
+import { RECETAS_PROXY_URL } from "./recetas-config.js";
 
 const DIA_LABEL = {
   lunes: "Lunes",
@@ -98,7 +101,7 @@ let inventarioCache = [];
 let alimentosCache = [];
 let html5QrScanner = null;
 let compraSemanaId = null;
-let compraNecesidades = new Map();
+let compraUsos = [];
 let compraDoc = { marcados: {}, extras: [] };
 
 const UBICACION_LABEL = { nevera: "🧊 Nevera", congelador: "🧊❄️ Congelador", despensa: "🥫 Despensa" };
@@ -396,6 +399,7 @@ function initAuth() {
       renderConfigForm();
       renderInventarioList();
       buildAlimentosConocidos();
+      recetaCompartida();
     } else {
       btnLogin.hidden = false;
       btnLogout.hidden = true;
@@ -551,6 +555,7 @@ function renderRecetaBloque(comida, plato, curso) {
       ${catBadge(plato.categoria)}
       ${ingredientes ? `<h4>Ingredientes</h4><ul class="ingredientes-chips">${ingredientes}</ul>` : ""}
       ${pasos ? `<h4>Pasos</h4><ol class="receta-pasos">${pasos}</ol>` : ""}
+      ${plato.fuente ? `<p><a href="${escapeHTML(plato.fuente)}" target="_blank" rel="noopener">Ver receta original ↗</a></p>` : ""}
     </article>
   `;
 }
@@ -642,6 +647,7 @@ function initFormPlato() {
       categoria: document.getElementById("plato-categoria").value,
       curso: document.getElementById("plato-curso").value,
       tiempoPrep: document.getElementById("plato-tiempo").value,
+      fuente: document.getElementById("plato-fuente").value,
       favorito: document.getElementById("plato-favorito").checked,
       ingredientes,
       pasos: leerPasos(),
@@ -672,6 +678,7 @@ function initFormPlato() {
 function resetFormPlato() {
   document.getElementById("form-plato").reset();
   document.getElementById("plato-id").value = "";
+  document.getElementById("plato-fuente").value = "";
   document.getElementById("plato-favorito").checked = false;
   document.getElementById("plato-curso").dataset.manual = "";
   document.getElementById("btn-cancelar-edicion").hidden = true;
@@ -760,6 +767,7 @@ function cargarPlatoEnForm(plato) {
   document.getElementById("plato-curso").value = cursoDePlato(plato);
   document.getElementById("plato-curso").dataset.manual = plato.curso ? "1" : "";
   document.getElementById("plato-tiempo").value = plato.tiempoPrep || "normal";
+  document.getElementById("plato-fuente").value = plato.fuente || "";
   document.getElementById("plato-favorito").checked = !!plato.favorito;
   resetIngredientes(plato.ingredientes || []);
   resetPasos(plato.pasos || []);
@@ -988,19 +996,43 @@ function initMenuEscolarPersistence() {
 
 // ---------- pestaña "Menú semanal": calendario ----------
 
-// Cualquier día que se elija en el calendario se lleva al lunes de su semana.
-function ajustarALunes(input) {
-  if (!input.value) input.value = toISO(mondayOf(new Date()));
-  const lunes = toISO(mondayOf(parseISO(input.value)));
-  if (lunes !== input.value) input.value = lunes;
+// ---------- navegador de semanas (compartido por Menú y Compra) ----------
+
+function semanaSeleccionada() {
+  return document.getElementById("week-start").value || toISO(mondayOf(new Date()));
 }
 
-function initWeekStartDefault() {
-  const input = document.getElementById("week-start");
-  input.value = toISO(mondayOf(new Date()));
-  input.addEventListener("change", () => {
-    ajustarALunes(input);
-    renderMenuTab();
+function etiquetaSemana(lunes) {
+  const ini = parseISO(lunes);
+  const fin = parseISO(sumarDias(lunes, 6));
+  const mes = (d) => d.toLocaleDateString("es-ES", { month: "long" });
+  const texto = ini.getMonth() === fin.getMonth()
+    ? `${ini.getDate()} – ${fin.getDate()} de ${mes(fin)}`
+    : `${ini.getDate()} de ${mes(ini)} – ${fin.getDate()} de ${mes(fin)}`;
+  return lunes === toISO(mondayOf(new Date())) ? `${texto} (esta semana)` : texto;
+}
+
+// Cualquier fecha se lleva al lunes de su semana; se actualizan los dos
+// selectores y se recarga la pestaña que esté a la vista.
+function cambiarSemana(fechaISO, recargar = true) {
+  const lunes = toISO(mondayOf(parseISO(fechaISO)));
+  for (const id of ["week-start", "compra-week-start"]) document.getElementById(id).value = lunes;
+  document.querySelectorAll(".semana-etiqueta").forEach((el) => (el.textContent = etiquetaSemana(lunes)));
+  if (!recargar) return;
+  if (!document.getElementById("tab-menu").hidden) renderMenuTab();
+  if (!document.getElementById("tab-compra").hidden) recalcularCompra();
+}
+
+function initNavegadorSemanas() {
+  cambiarSemana(toISO(new Date()), false);
+  document.querySelectorAll(".semana-nav").forEach((nav) => {
+    nav.querySelector('input[type="date"]').addEventListener("change", (e) => cambiarSemana(e.target.value || toISO(new Date())));
+    nav.querySelectorAll("[data-mover]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const mover = Number(btn.dataset.mover);
+        cambiarSemana(mover === 0 ? toISO(new Date()) : sumarDias(semanaSeleccionada(), 7 * mover));
+      });
+    });
   });
 }
 
@@ -1267,60 +1299,33 @@ function renderInventarioList() {
 
 // ---------- pestaña "Compra" ----------
 
-function claveNecesidad(alimentoId, nombre, unidad) {
-  const base = alimentoId || normalizarNombreAlimento(nombre);
-  return `${base}|${(unidad || "").toLowerCase().trim()}`;
-}
-
-// Suma los ingredientes de todos los platos del menú de esa semana,
-// agrupando por alimento+unidad (no se puede sumar "400 g" con "2 uds" del
-// mismo alimento con garantías, así que se quedan como líneas separadas).
-function calcularNecesidades(diasMenu) {
-  const mapa = new Map();
+// Ingredientes de todos los platos del menú de esa semana (uno por cada vez
+// que aparecen); agruparCompra() los junta por alimento y suma cantidades.
+function usosDelMenu(diasMenu) {
+  const usos = [];
   for (const dia of DIAS) {
     for (const comida of COMIDAS) {
-      const ids = idsDeComida(diasMenu?.[dia]?.[comida]);
-      for (const platoId of ids) {
+      for (const platoId of idsDeComida(diasMenu?.[dia]?.[comida])) {
         const plato = platosCache.find((p) => p.id === platoId);
         if (!plato) continue;
         for (const ingRaw of plato.ingredientes || []) {
           const ing = normalizarIngrediente(ingRaw);
           if (!ing.nombre) continue;
-          const alimentoId = typeof ingRaw === "object" ? ingRaw.alimentoId : null;
-          const clave = claveNecesidad(alimentoId, ing.nombre, ing.unidad);
-          if (!mapa.has(clave)) {
-            mapa.set(clave, { alimentoId, nombre: ing.nombre, unidad: ing.unidad, cantidad: 0, sinCantidad: false });
-          }
-          const entrada = mapa.get(clave);
-          if (ing.cantidad != null) entrada.cantidad += ing.cantidad;
-          else entrada.sinCantidad = true;
+          usos.push({
+            alimentoId: typeof ingRaw === "object" ? ingRaw.alimentoId : null,
+            nombre: ing.nombre,
+            cantidad: ing.cantidad,
+            unidad: ing.unidad,
+            plato: plato.nombre,
+          });
         }
       }
     }
   }
-  return mapa;
-}
-
-function disponibleEnInventario(alimentoId, nombre, unidad) {
-  const unidadNorm = (unidad || "").toLowerCase().trim();
-  return inventarioCache
-    .filter((i) => {
-      const coincideAlimento = alimentoId
-        ? i.alimentoId === alimentoId
-        : normalizarNombreAlimento(i.nombre) === normalizarNombreAlimento(nombre);
-      const coincideUnidad = (i.unidad || "").toLowerCase().trim() === unidadNorm;
-      return coincideAlimento && coincideUnidad;
-    })
-    .reduce((sum, i) => sum + (i.cantidad || 0), 0);
+  return usos;
 }
 
 function initCompra() {
-  const input = document.getElementById("compra-week-start");
-  input.value = toISO(mondayOf(new Date()));
-  input.addEventListener("change", () => {
-    ajustarALunes(input);
-    recalcularCompra();
-  });
   document.getElementById("btn-recalcular-compra").addEventListener("click", recalcularCompra);
 
   document.getElementById("form-extra-compra").addEventListener("submit", async (e) => {
@@ -1329,16 +1334,14 @@ function initCompra() {
     if (!nombreTexto) return;
     const alimento = await resolverAlimento(nombreTexto);
     const cantidadTexto = document.getElementById("extra-cantidad").value;
-    const unidad = document.getElementById("extra-unidad").value.trim();
     compraDoc.extras.push({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       alimentoId: alimento?.id || null,
       nombre: alimento?.nombre || nombreTexto,
       cantidad: cantidadTexto ? Number(cantidadTexto) : null,
-      unidad,
-      comprado: false,
+      unidad: document.getElementById("extra-unidad").value.trim(),
     });
-    await guardarListaCompra(compraSemanaId, compraDoc);
+    guardarListaCompra(compraSemanaId, compraDoc);
     document.getElementById("form-extra-compra").reset();
     renderListaCompra();
     buildAlimentosConocidos();
@@ -1346,105 +1349,102 @@ function initCompra() {
 }
 
 async function recalcularCompra() {
-  const semanaId = document.getElementById("compra-week-start").value || toISO(mondayOf(new Date()));
+  const semanaId = semanaSeleccionada();
   compraSemanaId = semanaId;
   const menu = await obtenerMenuNormalizado(semanaId);
-  compraNecesidades = calcularNecesidades(menu?.dias || diasVacios());
+  compraUsos = usosDelMenu(menu?.dias || diasVacios());
   const guardado = (await obtenerListaCompra(semanaId)) || (await obtenerListaCompra(sumarDias(semanaId, -1)));
-  compraDoc = guardado || { marcados: {}, extras: [] };
-  if (!compraDoc.extras) compraDoc.extras = [];
-  if (!compraDoc.marcados) compraDoc.marcados = {};
+  compraDoc = { marcados: {}, extras: [], ...guardado };
   renderListaCompra();
+}
+
+function notaEntrada(e) {
+  const partes = [];
+  const comprar = formatearCantidades(e.aComprar);
+  const tengo = formatearCantidades(e.disponible);
+  if (e.cubierto) partes.push(`ya tienes suficiente (${tengo})`);
+  else {
+    if (comprar) partes.push(`<strong>${comprar}</strong>`);
+    if (e.sinCantidad) partes.push(comprar ? "+ cantidad sin indicar" : "cantidad sin indicar");
+    if (tengo) partes.push(`(tienes ${tengo} en casa)`);
+  }
+  return partes.join(" ");
 }
 
 function renderListaCompra() {
   const cont = document.getElementById("lista-compra-contenido");
   if (!cont) return;
-  cont.innerHTML = "";
+  const entradas = agruparCompra(compraUsos, compraDoc.extras, inventarioCache, alimentosCache);
+  for (const e of entradas) if (!SECCIONES.some((s) => s.id === e.seccion)) e.seccion = "otros";
 
-  const itemsAuto = [...compraNecesidades.entries()]
-    .map(([clave, n]) => {
-      const disponible = disponibleEnInventario(n.alimentoId, n.nombre, n.unidad);
-      const aComprar = n.sinCantidad ? null : Math.max(0, n.cantidad - disponible);
-      return { clave, ...n, disponible, aComprar };
-    })
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  if (entradas.length === 0) {
+    cont.innerHTML = `<div class="empty-state"><span class="empty-emoji">🛒</span><p>No hay nada que comprar: no hay menú esta semana o sus platos no tienen ingredientes.</p></div>`;
+    return;
+  }
 
-  const seccionAuto = document.createElement("section");
-  seccionAuto.className = "compra-seccion";
-  if (itemsAuto.length === 0) {
-    seccionAuto.innerHTML = `<h3 class="compra-seccion-titulo">Del menú</h3><p class="hint">No hay menú generado esta semana, o los platos no tienen ingredientes cargados.</p>`;
-  } else {
-    seccionAuto.innerHTML = `<h3 class="compra-seccion-titulo">Del menú (${itemsAuto.length})</h3><ul class="compra-lista"></ul>`;
-    const ul = seccionAuto.querySelector("ul");
-    for (const item of itemsAuto) {
-      const marcado = !!compraDoc.marcados[item.clave];
-      let nota;
-      if (item.sinCantidad) nota = "cantidad no especificada en la receta";
-      else if (item.aComprar <= 0) nota = `ya tienes suficiente (${item.disponible} ${item.unidad || ""})`.trim();
-      else nota = `${item.aComprar} ${item.unidad || ""}`.trim() + (item.disponible > 0 ? ` (ya tienes ${item.disponible})` : "");
-      const li = document.createElement("li");
-      li.className = marcado ? "comprado" : "";
-      li.innerHTML = `
-        <input type="checkbox" ${marcado ? "checked" : ""} />
-        <div class="compra-item-info">
-          <div class="compra-item-nombre">${item.nombre}</div>
-          <div class="compra-item-nota">${nota}</div>
-        </div>
-      `;
-      li.querySelector("input").addEventListener("change", (e) => toggleMarcadoAuto(item.clave, e.target.checked, li));
-      ul.appendChild(li);
+  const pendientes = entradas.filter((e) => !e.cubierto && !compraDoc.marcados[e.clave]).length;
+  const opcionesSeccion = SECCIONES.map((s) => `<option value="${s.id}">${s.icono} ${s.nombre}</option>`).join("");
+  let html = `<p class="compra-resumen">${pendientes} por comprar · ${entradas.length} en total</p>`;
+
+  for (const seccion of SECCIONES) {
+    const items = entradas
+      .filter((e) => e.seccion === seccion.id)
+      .sort((a, b) => Number(a.cubierto) - Number(b.cubierto) || a.nombre.localeCompare(b.nombre, "es"));
+    if (!items.length) continue;
+    html += `<section class="compra-seccion"><h3 class="compra-seccion-titulo">${seccion.icono} ${seccion.nombre} <span class="hint">(${items.length})</span></h3><ul class="compra-lista">`;
+    for (const e of items) {
+      const marcado = !!compraDoc.marcados[e.clave];
+      const extras = e.extras
+        .map((x) => `<span class="compra-extra">a mano: ${escapeHTML([x.cantidad, x.unidad].filter((v) => v != null && v !== "").join(" ") || "sin cantidad")}<button type="button" class="btn-quitar-plato" data-extra="${x.id}" title="Quitar">×</button></span>`)
+        .join("");
+      html += `
+        <li class="${marcado ? "comprado" : ""} ${e.cubierto ? "cubierto" : ""}" data-clave="${escapeHTML(e.clave)}">
+          <input type="checkbox" ${marcado ? "checked" : ""} />
+          <div class="compra-item-info">
+            <div class="compra-item-nombre">${escapeHTML(e.nombre)}</div>
+            <div class="compra-item-nota">${notaEntrada(e)}</div>
+            ${e.platos.length ? `<div class="compra-item-platos">para: ${escapeHTML(e.platos.join(", "))}</div>` : ""}
+            ${extras}
+          </div>
+          <select class="select-seccion" title="Mover a otra sección">${opcionesSeccion}</select>
+        </li>`;
     }
+    html += `</ul></section>`;
   }
-  cont.appendChild(seccionAuto);
+  cont.innerHTML = html;
 
-  const seccionExtra = document.createElement("section");
-  seccionExtra.className = "compra-seccion";
-  seccionExtra.innerHTML = `<h3 class="compra-seccion-titulo">Añadidos a mano (${compraDoc.extras.length})</h3><ul class="compra-lista"></ul>`;
-  const ulExtra = seccionExtra.querySelector("ul");
-  if (compraDoc.extras.length === 0) {
-    ulExtra.innerHTML = `<li class="hint" style="box-shadow:none;background:none;border:none;">Nada añadido a mano todavía.</li>`;
-  }
-  for (const extra of compraDoc.extras) {
-    const li = document.createElement("li");
-    li.className = extra.comprado ? "comprado" : "";
-    li.innerHTML = `
-      <input type="checkbox" ${extra.comprado ? "checked" : ""} />
-      <div class="compra-item-info">
-        <div class="compra-item-nombre">${extra.nombre}</div>
-        <div class="compra-item-nota">${[extra.cantidad, extra.unidad].filter(Boolean).join(" ")}</div>
-      </div>
-      <button type="button" class="btn-remove-row" title="Quitar">×</button>
-    `;
-    li.querySelector('input[type="checkbox"]').addEventListener("change", (e) => toggleExtraComprado(extra.id, e.target.checked, li));
-    li.querySelector(".btn-remove-row").addEventListener("click", () => quitarExtra(extra.id));
-    ulExtra.appendChild(li);
-  }
-  cont.appendChild(seccionExtra);
+  cont.querySelectorAll("li[data-clave]").forEach((li) => {
+    const entrada = entradas.find((e) => e.clave === li.dataset.clave);
+    const select = li.querySelector(".select-seccion");
+    select.value = entrada.seccion;
+    select.addEventListener("change", () => cambiarSeccion(entrada, select.value));
+    li.querySelector('input[type="checkbox"]').addEventListener("change", (ev) => {
+      compraDoc.marcados[entrada.clave] = ev.target.checked;
+      li.classList.toggle("comprado", ev.target.checked);
+      guardarListaCompra(compraSemanaId, compraDoc);
+    });
+  });
+  cont.querySelectorAll("[data-extra]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      compraDoc.extras = compraDoc.extras.filter((x) => x.id !== btn.dataset.extra);
+      guardarListaCompra(compraSemanaId, compraDoc);
+      renderListaCompra();
+    });
+  });
 }
 
-async function toggleMarcadoAuto(clave, marcado, li) {
-  compraDoc.marcados[clave] = marcado;
-  li.classList.toggle("comprado", marcado);
-  await guardarListaCompra(compraSemanaId, compraDoc);
-}
-
-async function toggleExtraComprado(id, comprado, li) {
-  const extra = compraDoc.extras.find((e) => e.id === id);
-  if (extra) extra.comprado = comprado;
-  li.classList.toggle("comprado", comprado);
-  await guardarListaCompra(compraSemanaId, compraDoc);
-}
-
-async function quitarExtra(id) {
-  compraDoc.extras = compraDoc.extras.filter((e) => e.id !== id);
-  await guardarListaCompra(compraSemanaId, compraDoc);
+// La sección se guarda en el alimento, así la próxima vez ya sale bien.
+async function cambiarSeccion(entrada, seccion) {
+  let alimento = entrada.alimentoId && alimentosCache.find((a) => a.id === entrada.alimentoId);
+  if (!alimento) alimento = await resolverAlimento(entrada.nombre);
+  if (!alimento) return;
+  alimento.seccion = seccion;
+  guardarAlimento({ id: alimento.id, seccion });
   renderListaCompra();
 }
 
-// ---------- Importar el menú escolar: PDF (se vuelca por semanas) o foto (solo texto) ----------
 
-let semanasPDF = [];
+// ---------- Importar el menú escolar: PDF (se guardan todas sus semanas) o foto (solo texto) ----------
 
 function initEscolarOCR() {
   if (window.pdfjsLib) {
@@ -1454,9 +1454,6 @@ function initEscolarOCR() {
   const btn = document.getElementById("btn-importar-foto");
   const input = document.getElementById("escolar-foto");
   btn.addEventListener("click", () => input.click());
-  document.getElementById("btn-volcar-semana").addEventListener("click", () => {
-    volcarSemanaPDF(Number(document.getElementById("escolar-pdf-select").value));
-  });
 
   input.addEventListener("change", async () => {
     const file = input.files[0];
@@ -1465,13 +1462,12 @@ function initEscolarOCR() {
     try {
       if (file.type === "application/pdf") {
         resultado.hidden = true;
-        await leerPDFEscolar(file);
+        await importarPDFEscolar(file);
       } else {
         if (!window.Tesseract) {
           showToast("No se pudo cargar el lector de texto.", "error");
           return;
         }
-        document.getElementById("escolar-pdf-semanas").hidden = true;
         resultado.hidden = false;
         resultado.textContent = "Leyendo imagen… puede tardar unos segundos.";
         const { data } = await Tesseract.recognize(file, "spa");
@@ -1480,13 +1476,15 @@ function initEscolarOCR() {
       }
     } catch (err) {
       resultado.hidden = false;
-      resultado.textContent = "No se ha podido leer el archivo: " + err.message;
+      resultado.textContent = "No se ha podido leer el archivo: " + (err?.message || err);
     }
     input.value = "";
   });
 }
 
-async function leerPDFEscolar(file) {
+// Guarda el menú del cole de todas las semanas del PDF (cada una en su
+// semana), conservando la comida y la cena de casa que ya hubiera.
+async function importarPDFEscolar(file) {
   if (!window.pdfjsLib) {
     showToast("No se pudo cargar el lector de PDF.", "error");
     return;
@@ -1497,59 +1495,49 @@ async function leerPDFEscolar(file) {
     return;
   }
   const { semanas } = parsearMenuEscolar(paginas);
-  semanasPDF = semanas;
+  const conFecha = semanas.filter((s) => s.lunes);
   if (semanas.length === 0) {
     showToast("No he reconocido la tabla del menú en este PDF; tendrás que rellenarlo a mano.", "error");
     return;
   }
-
-  const select = document.getElementById("escolar-pdf-select");
-  const semanaActual = document.getElementById("week-start").value;
-  select.innerHTML = semanas.map((s, i) => `<option value="${i}">${etiquetaSemanaPDF(s)}</option>`).join("");
-  const coincide = semanas.findIndex((s) => s.lunes === semanaActual);
-  select.value = String(coincide >= 0 ? coincide : 0);
-  document.getElementById("escolar-pdf-semanas").hidden = false;
-  showToast(`He encontrado ${semanas.length} semanas en el PDF. Elige cuál volcar.`, "success");
-}
-
-function etiquetaSemanaPDF(semana) {
-  if (semana.lunes) {
-    const ini = parseISO(semana.lunes);
-    const fin = parseISO(sumarDias(semana.lunes, 4));
-    const mes = (d) => d.toLocaleDateString("es-ES", { month: "long" });
-    return ini.getMonth() === fin.getMonth()
-      ? `Semana del ${ini.getDate()} al ${fin.getDate()} de ${mes(fin)}`
-      : `Semana del ${ini.getDate()} de ${mes(ini)} al ${fin.getDate()} de ${mes(fin)}`;
-  }
-  const dias = DIAS_ESCOLAR.map((d) => semana.dias[d]?.diaDelMes).filter(Boolean);
-  return `Semana de los días ${dias[0]} a ${dias[dias.length - 1]}`;
-}
-
-// Vuelca la semana elegida del PDF en el menú escolar de esa misma semana
-// (si el PDF trae mes y año, se cambia el selector de semana a esas fechas).
-async function volcarSemanaPDF(indice) {
-  const semana = semanasPDF[indice];
-  if (!semana) return;
-
-  const inputSemana = document.getElementById("week-start");
-  if (semana.lunes && semana.lunes !== inputSemana.value) {
-    inputSemana.value = semana.lunes;
-    await renderMenuTab();
+  if (conFecha.length === 0) {
+    showToast("No encuentro el mes y el año en el PDF, así que no sé a qué semanas corresponde. Rellénalo a mano.", "error");
+    return;
   }
 
-  const nuevo = {};
-  let conPlatos = 0;
-  for (const dia of DIAS_ESCOLAR) {
-    const d = semana.dias[dia];
-    nuevo[dia] = d ? { primero: d.primero, segundo: d.segundo, postre: d.postre } : escolarDiaVacio();
-    if (d && (d.primero.nombre || d.segundo.nombre)) conPlatos++;
+  const existentes = await Promise.all(conFecha.map((s) => obtenerMenuNormalizado(s.lunes)));
+  const yaHabiaCole = existentes.some((m) => DIAS_ESCOLAR.some((d) => normalizarEscolarDia(m?.menuEscolar?.[d]).primero.nombre));
+  if (yaHabiaCole) {
+    const ok = await confirmDialog("Algunas de estas semanas ya tenían menú del cole. Se sustituirá por el del PDF (la comida y la cena de casa no se tocan). ¿Continuar?");
+    if (!ok) return;
   }
-  aplicarMenuEscolarAlFormulario(nuevo);
-  await persistirMenuActual();
-  renderMenuGrid();
+
+  conFecha.forEach((semana, i) => {
+    const menuEscolar = {};
+    for (const dia of DIAS_ESCOLAR) {
+      const d = semana.dias[dia];
+      menuEscolar[dia] = d ? { primero: d.primero, segundo: d.segundo, postre: d.postre } : escolarDiaVacio();
+    }
+    guardarMenu(semana.lunes, { dias: existentes[i]?.dias || diasVacios(), menuEscolar });
+  });
+
+  const actual = semanaSeleccionada();
+  const destino = conFecha.some((s) => s.lunes === actual) ? actual : conFecha[0].lunes;
+  menuActualDias = null;
+  cambiarSemana(destino);
   document.getElementById("menu-escolar-box").open = true;
-  showToast(`Volcados ${conPlatos} días del cole. Revisa nombres e iconos y corrige lo que haga falta.`, "success");
+
+  const primera = conFecha[0].lunes;
+  const ultima = conFecha[conFecha.length - 1].lunes;
+  const fmt = (iso, n) => parseISO(sumarDias(iso, n)).toLocaleDateString("es-ES", { day: "numeric", month: "long" });
+  const sinFecha = semanas.length - conFecha.length;
+  showToast(
+    `Guardado el menú del cole de ${conFecha.length} semanas (del ${fmt(primera, 0)} al ${fmt(ultima, 4)}). Muévete con ◀ ▶ para revisarlas.` +
+      (sinFecha ? ` ${sinFecha} semana(s) sin fecha no se han podido guardar.` : ""),
+    "success"
+  );
 }
+
 
 // ---------- escáner de código de barras ----------
 
@@ -1617,6 +1605,81 @@ async function cerrarEscaner() {
   }
 }
 
+// ---------- importar recetas (web o texto pegado) ----------
+
+function initImportarReceta() {
+  document.getElementById("btn-importar-url").addEventListener("click", () => importarRecetaURL(document.getElementById("importar-url").value));
+  document.getElementById("importar-url").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") importarRecetaURL(e.target.value);
+  });
+  document.getElementById("btn-importar-texto").addEventListener("click", () => {
+    const plato = desdeTexto(document.getElementById("importar-texto").value);
+    if (!plato || !plato.nombre) {
+      showToast("No he encontrado una receta en ese texto.", "error");
+      return;
+    }
+    rellenarFormularioConReceta(plato);
+    document.getElementById("importar-texto").value = "";
+  });
+}
+
+async function importarRecetaURL(texto) {
+  const url = (String(texto).match(/https?:\/\/\S+/) || [])[0];
+  if (!url) {
+    showToast("Pega el enlace completo de la receta (empieza por https://).", "error");
+    return;
+  }
+  if (!RECETAS_PROXY_URL) {
+    showToast("Falta configurar el intermediario de recetas (README → «Importar recetas de webs»). Mientras, usa «Pegar texto».", "error");
+    return;
+  }
+  const btn = document.getElementById("btn-importar-url");
+  btn.disabled = true;
+  btn.textContent = "Importando…";
+  try {
+    const res = await fetch(`${RECETAS_PROXY_URL}?url=${encodeURIComponent(url)}`);
+    const datos = await res.json().catch(() => ({}));
+    if (!res.ok || !datos.receta) throw new Error(datos.error || `error ${res.status}`);
+    rellenarFormularioConReceta(desdeSchemaOrg(datos.receta, datos.url || url));
+    document.getElementById("importar-url").value = "";
+  } catch (err) {
+    showToast("No se ha podido importar: " + (err?.message || err), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Importar";
+  }
+}
+
+// Rellena el formulario de plato nuevo con la receta importada; se revisa y
+// se guarda como cualquier otro (los ingredientes pasan por el catálogo de
+// alimentos al guardar).
+function rellenarFormularioConReceta(plato) {
+  resetFormPlato();
+  document.getElementById("plato-nombre").value = plato.nombre;
+  document.getElementById("plato-categoria").value = plato.categoria;
+  document.getElementById("plato-curso").value = plato.curso;
+  document.getElementById("plato-tiempo").value = plato.tiempoPrep;
+  document.getElementById("plato-fuente").value = plato.fuente || "";
+  resetIngredientes(plato.ingredientes);
+  resetPasos(plato.pasos);
+  document.getElementById("btn-cancelar-edicion").hidden = false;
+  document.getElementById("importar-receta").open = false;
+  document.getElementById("plato-nombre").scrollIntoView({ behavior: "smooth", block: "center" });
+  showToast(`Receta cargada: ${plato.ingredientes.length} ingredientes y ${plato.pasos.length} pasos. Revísala y pulsa «Guardar plato».`, "success");
+}
+
+// Al compartir una página con Fame desde el móvil (Compartir → Fame), la app
+// se abre con el enlace en la dirección; se importa en cuanto hay sesión.
+function recetaCompartida() {
+  const params = new URLSearchParams(location.search);
+  const texto = [params.get("url"), params.get("text"), params.get("title")].filter(Boolean).join(" ");
+  const url = (texto.match(/https?:\/\/\S+/) || [])[0];
+  if (!url) return;
+  history.replaceState(null, "", location.pathname);
+  document.querySelector('[data-tab="platos"]').click();
+  importarRecetaURL(url);
+}
+
 // ---------- PWA: service worker e instalación ----------
 
 function initPWA() {
@@ -1651,7 +1714,7 @@ document.addEventListener("DOMContentLoaded", () => {
   buildMenuEscolarGrid();
   initMenuEscolarPersistence();
   buildFiltroCategoriaChips();
-  initWeekStartDefault();
+  initNavegadorSemanas();
   initFormPlato();
   initFormConfig();
   initGenerarMenu();
@@ -1661,6 +1724,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initCompra();
   initEscolarOCR();
   initPWA();
+  initImportarReceta();
   window.addEventListener("fame:error-guardado", (e) => {
     console.error(e.detail);
     showToast("No se ha podido guardar un cambio en el servidor: " + (e.detail?.message || e.detail), "error");
@@ -1679,4 +1743,5 @@ window.importarSeed = async function importarSeed() {
   renderPlatosList();
   console.log(`Importados ${platos.length} platos.`);
 };
+
 
