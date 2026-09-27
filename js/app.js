@@ -435,10 +435,14 @@ function restriccionesPorDefecto() {
 
 // ---------- bloques del día: cole, comida y cena con el mismo formato ----------
 
+function icono(nombre) {
+  return `<svg class="ic"><use href="#i-${nombre}"/></svg>`;
+}
+
 const BLOQUE = {
-  cole: { icono: "🏫", titulo: "Cole" },
-  comida: { icono: "☀️", titulo: "Comida" },
-  cena: { icono: "🌙", titulo: "Cena" },
+  cole: { icono: icono("cole"), titulo: "Cole" },
+  comida: { icono: icono("hoy"), titulo: "Comida" },
+  cena: { icono: icono("luna"), titulo: "Cena" },
 };
 
 function escapeHTML(texto) {
@@ -505,6 +509,7 @@ function bloqueCasaHTML(dia, comida, datosComida, editable) {
 
 async function renderHoy() {
   const el = document.getElementById("hoy-content");
+  el.classList.remove("loading");
   el.innerHTML = `<p class="loading">Cargando…</p>`;
   const hoy = new Date();
   const lunes = toISO(mondayOf(hoy));
@@ -512,9 +517,11 @@ async function renderHoy() {
   const menu = await obtenerMenuNormalizado(lunes);
 
   const fechaLegible = hoy.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+  const hora = hoy.getHours();
+  const saludo = hora < 14 ? "Buenos días" : hora < 21 ? "Buenas tardes" : "Buenas noches";
   const cabecera = `
     <div class="hoy-hero">
-      <p class="hoy-fecha">${DIA_LABEL[diaKey]}</p>
+      <p class="hoy-saludo">${saludo}</p>
       <h2>${fechaLegible}</h2>
     </div>
   `;
@@ -539,24 +546,32 @@ async function renderHoy() {
 
   const sinNada = recetas.length === 0;
   el.innerHTML = cabecera + bloques + (sinNada
-    ? `<div class="empty-state"><span class="empty-emoji">🗓️</span><p>No hay menú de casa generado para hoy. Ve a "Menú" para generarlo.</p></div>`
+    ? `<div class="empty-state"><span class="empty-icono">${icono("calendario")}</span><p>No hay menú de casa generado para hoy. Ve a "Menú" para generarlo.</p></div>`
     : `<h3 class="hoy-recetas-titulo">Recetas de hoy</h3>${recetas.join("")}`);
 }
 
+// Cada receta del día es una tarjeta plegable: a la vista solo el plato, y al
+// tocarla se despliegan ingredientes y pasos.
 function renderRecetaBloque(comida, plato, curso) {
-  const etiqueta = `${BLOQUE[comida].icono} ${BLOQUE[comida].titulo}${curso ? ` · ${CURSO_NOMBRE[curso]}` : ""}`;
-  if (!plato) return `<article class="receta-card"><p class="comida-label">${etiqueta}</p><p>Plato no encontrado.</p></article>`;
-  const ingredientes = (plato.ingredientes || []).map((i) => `<li>${formatearIngrediente(i)}</li>`).join("");
-  const pasos = (plato.pasos || []).map((p) => `<li>${p}</li>`).join("");
+  const etiqueta = `${BLOQUE[comida].titulo}${curso ? ` · ${CURSO_NOMBRE[curso]}` : ""}`;
+  if (!plato) return `<div class="receta-card"><p class="comida-label" style="padding:1rem">${etiqueta}: plato no encontrado.</p></div>`;
+  const ingredientes = (plato.ingredientes || []).map((i) => `<li>${escapeHTML(formatearIngrediente(i))}</li>`).join("");
+  const pasos = (plato.pasos || []).map((p) => `<li>${escapeHTML(p)}</li>`).join("");
   return `
-    <article class="receta-card">
-      <p class="comida-label">${etiqueta}</p>
-      <h3>${plato.nombre}</h3>
-      ${catBadge(plato.categoria)}
-      ${ingredientes ? `<h4>Ingredientes</h4><ul class="ingredientes-chips">${ingredientes}</ul>` : ""}
-      ${pasos ? `<h4>Pasos</h4><ol class="receta-pasos">${pasos}</ol>` : ""}
-      ${plato.fuente ? `<p><a href="${escapeHTML(plato.fuente)}" target="_blank" rel="noopener">Ver receta original ↗</a></p>` : ""}
-    </article>
+    <details class="receta-card">
+      <summary>
+        <div class="receta-resumen">
+          <p class="comida-label">${etiqueta}</p>
+          <h3>${CATEGORIA_ICONO[plato.categoria] || ""} ${escapeHTML(plato.nombre)}</h3>
+        </div>
+      </summary>
+      <div class="receta-cuerpo">
+        ${ingredientes ? `<h4>Ingredientes</h4><ul class="ingredientes-chips">${ingredientes}</ul>` : ""}
+        ${pasos ? `<h4>Preparación</h4><ol class="receta-pasos">${pasos}</ol>` : ""}
+        ${!ingredientes && !pasos ? `<p class="hint">Este plato aún no tiene receta.</p>` : ""}
+        ${plato.fuente ? `<p><a href="${escapeHTML(plato.fuente)}" target="_blank" rel="noopener">Ver receta original ↗</a></p>` : ""}
+      </div>
+    </details>
   `;
 }
 
@@ -712,7 +727,7 @@ function renderPlatosList() {
   });
 
   if (filtrados.length === 0) {
-    contenedor.innerHTML = `<div class="empty-state"><span class="empty-emoji">🔍</span><p>No hay platos que coincidan.</p></div>`;
+    contenedor.innerHTML = `<div class="empty-state"><span class="empty-icono">${icono("buscar")}</span><p>No hay platos que coincidan.</p></div>`;
     return;
   }
 
@@ -735,9 +750,9 @@ function renderPlatosList() {
           <div class="plato-meta hint">${CURSO_NOMBRE[cursoDePlato(plato)]} · ${plato.tiempoPrep || "normal"}</div>
         </div>
         <div class="plato-actions">
-          <button data-action="favorito" class="btn-ghost btn-small" title="${plato.favorito ? "Quitar de favoritos" : "Marcar como favorito"}">${plato.favorito ? "⭐" : "☆"}</button>
-          <button data-action="editar" class="btn-ghost btn-small">Editar</button>
-          <button data-action="borrar" class="btn-ghost btn-small">Borrar</button>
+          <button data-action="favorito" class="${plato.favorito ? "fav-activo" : ""}" title="${plato.favorito ? "Quitar de favoritos" : "Marcar como favorito"}">${icono("estrella")}</button>
+          <button data-action="editar" title="Editar">${icono("lapiz")}</button>
+          <button data-action="borrar" title="Borrar">${icono("papelera")}</button>
         </div>
       `;
       li.querySelector('[data-action="favorito"]').addEventListener("click", async () => {
@@ -803,8 +818,8 @@ function crearFilaRegla(regla = {}) {
     .join("");
   row.innerHTML = `
     <select class="regla-categoria">${opciones}</select>
-    <input type="number" class="regla-min" placeholder="Mín/sem" min="0" max="14" value="${regla.minPorSemana ?? ""}" />
-    <input type="number" class="regla-max" placeholder="Máx/sem" min="0" max="14" value="${regla.maxPorSemana ?? ""}" />
+    <input type="number" class="regla-min" placeholder="Mín" title="Mínimo por semana" min="0" max="14" value="${regla.minPorSemana ?? ""}" />
+    <input type="number" class="regla-max" placeholder="Máx" title="Máximo por semana" min="0" max="14" value="${regla.maxPorSemana ?? ""}" />
     <button type="button" class="btn-remove-row" title="Quitar regla">×</button>
   `;
   row.querySelector(".btn-remove-row").addEventListener("click", () => row.remove());
@@ -890,6 +905,13 @@ function campoEscolar(dia, tipo, clase) {
   return document.querySelector(`#menu-escolar-grid .${clase}[data-dia="${dia}"][data-tipo="${tipo}"]`);
 }
 
+// El icono visible (a la izquierda del nombre) refleja siempre la categoría
+// elegida en el <select> oculto tras él; tocar el icono abre ese desplegable.
+function sincronizarIconoEscolar(select) {
+  const emoji = select.closest(".icono-cat")?.querySelector(".icono-cat-emoji");
+  if (emoji) emoji.textContent = CATEGORIA_ICONO[select.value] || "❔";
+}
+
 function buildMenuEscolarGrid() {
   const cont = document.getElementById("menu-escolar-grid");
   cont.innerHTML = "";
@@ -899,7 +921,10 @@ function buildMenuEscolarGrid() {
     const lineas = TIPOS_ESCOLAR.map(({ tipo, etiqueta, placeholder }) => `
       <div class="escolar-plato">
         <span class="escolar-tipo">${etiqueta}</span>
-        <select class="escolar-cat" data-dia="${dia}" data-tipo="${tipo}" title="Categoría">${opcionesCategoriaEscolar(tipo)}</select>
+        <label class="icono-cat" title="Cambiar categoría">
+          <span class="icono-cat-emoji">❔</span>
+          <select class="escolar-cat" data-dia="${dia}" data-tipo="${tipo}" aria-label="Categoría">${opcionesCategoriaEscolar(tipo)}</select>
+        </label>
         <input type="text" class="escolar-nombre" data-dia="${dia}" data-tipo="${tipo}" placeholder="${placeholder}" />
         ${tipo === "segundo" ? `<input type="text" class="escolar-guarnicion" data-dia="${dia}" data-tipo="segundo" placeholder="Guarnición" />` : ""}
       </div>
@@ -966,6 +991,7 @@ function aplicarMenuEscolarAlFormulario(menuEscolar) {
       if (cat) {
         cat.value = dato[tipo].categoria;
         cat.dataset.manual = "";
+        sincronizarIconoEscolar(cat);
       }
     }
     const guarnicion = campoEscolar(dia, "segundo", "escolar-guarnicion");
@@ -981,12 +1007,16 @@ function aplicarMenuEscolarAlFormulario(menuEscolar) {
 function initMenuEscolarPersistence() {
   document.getElementById("menu-escolar-grid").addEventListener("change", async (e) => {
     const el = e.target;
-    if (el.classList.contains("escolar-cat")) el.dataset.manual = "1";
+    if (el.classList.contains("escolar-cat")) {
+      el.dataset.manual = "1";
+      sincronizarIconoEscolar(el);
+    }
     // Al escribir el nombre se deduce el icono, salvo que se haya elegido a mano.
     if (el.classList.contains("escolar-nombre")) {
       const cat = campoEscolar(el.dataset.dia, el.dataset.tipo, "escolar-cat");
       if (cat && cat.dataset.manual !== "1") {
         cat.value = el.dataset.tipo === "postre" ? categorizarPostre(el.value) : categorizarPlato(el.value);
+        sincronizarIconoEscolar(cat);
       }
     }
     await persistirMenuActual();
@@ -1009,7 +1039,7 @@ function etiquetaSemana(lunes) {
   const texto = ini.getMonth() === fin.getMonth()
     ? `${ini.getDate()} – ${fin.getDate()} de ${mes(fin)}`
     : `${ini.getDate()} de ${mes(ini)} – ${fin.getDate()} de ${mes(fin)}`;
-  return lunes === toISO(mondayOf(new Date())) ? `${texto} (esta semana)` : texto;
+  return texto;
 }
 
 // Cualquier fecha se lleva al lunes de su semana; se actualizan los dos
@@ -1018,6 +1048,10 @@ function cambiarSemana(fechaISO, recargar = true) {
   const lunes = toISO(mondayOf(parseISO(fechaISO)));
   for (const id of ["week-start", "compra-week-start"]) document.getElementById(id).value = lunes;
   document.querySelectorAll(".semana-etiqueta").forEach((el) => (el.textContent = etiquetaSemana(lunes)));
+  // "Esta semana" solo hace falta cuando se está viendo otra semana.
+  const esActual = lunes === toISO(mondayOf(new Date()));
+  document.querySelectorAll('.semana-nav [data-mover="0"]').forEach((b) => (b.hidden = esActual));
+  diaMenuActivo = null;
   if (!recargar) return;
   if (!document.getElementById("tab-menu").hidden) renderMenuTab();
   if (!document.getElementById("tab-compra").hidden) recalcularCompra();
@@ -1047,6 +1081,62 @@ async function renderMenuTab() {
   ocultarAvisos();
 }
 
+// ---------- Menú en el móvil: un día cada vez ----------
+// En pantallas estrechas la rejilla muestra solo el día elegido en la tira
+// de días (L M X J V S D), y se cambia de día deslizando a los lados. En el
+// ordenador se ve la semana entera (la tira y el filtro se ocultan por CSS).
+
+let diaMenuActivo = null;
+
+const INICIAL_DIA = { lunes: "L", martes: "M", miercoles: "X", jueves: "J", viernes: "V", sabado: "S", domingo: "D" };
+
+function diaInicialMenu() {
+  const semanaId = document.getElementById("week-start").value;
+  const hoy = toISO(new Date());
+  const indice = DIAS.findIndex((_, i) => sumarDias(semanaId, i) === hoy);
+  return indice >= 0 ? DIAS[indice] : "lunes";
+}
+
+function renderTiraDias() {
+  const tira = document.getElementById("menu-dias-tira");
+  const grid = document.getElementById("menu-grid");
+  const semanaId = document.getElementById("week-start").value;
+  if (!diaMenuActivo) diaMenuActivo = diaInicialMenu();
+  const hoy = toISO(new Date());
+  tira.innerHTML = DIAS.map((dia, i) => {
+    const fecha = sumarDias(semanaId, i);
+    const clases = ["dia-chip", dia === diaMenuActivo ? "activo" : "", fecha === hoy ? "hoy" : ""].join(" ");
+    return `<button type="button" class="${clases}" data-dia="${dia}">${INICIAL_DIA[dia]}<b>${parseISO(fecha).getDate()}</b></button>`;
+  }).join("");
+  grid.dataset.diaActivo = diaMenuActivo;
+  tira.querySelectorAll(".dia-chip").forEach((btn) => btn.addEventListener("click", () => elegirDiaMenu(btn.dataset.dia)));
+}
+
+function elegirDiaMenu(dia) {
+  diaMenuActivo = dia;
+  renderTiraDias();
+}
+
+function initDeslizarDias() {
+  const grid = document.getElementById("menu-grid");
+  let inicioX = null;
+  let inicioY = null;
+  grid.addEventListener("touchstart", (e) => {
+    inicioX = e.touches[0].clientX;
+    inicioY = e.touches[0].clientY;
+  }, { passive: true });
+  grid.addEventListener("touchend", (e) => {
+    if (inicioX === null) return;
+    const dx = e.changedTouches[0].clientX - inicioX;
+    const dy = e.changedTouches[0].clientY - inicioY;
+    inicioX = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const i = DIAS.indexOf(diaMenuActivo);
+    const siguiente = DIAS[Math.min(DIAS.length - 1, Math.max(0, i + (dx < 0 ? 1 : -1)))];
+    if (siguiente !== diaMenuActivo) elegirDiaMenu(siguiente);
+  }, { passive: true });
+}
+
 // Rejilla semanal: una fila por día con tres bloques (cole, comida y cena)
 // en el mismo formato de líneas 1º / 2º / postre. Al ser una rejilla de
 // filas y columnas reales, los bloques de un mismo día quedan alineados.
@@ -1072,7 +1162,7 @@ function renderMenuGrid() {
       <div class="menu-dia">
         <span class="menu-dia-nombre">${DIA_LABEL[dia]}</span>
         <span class="hint">${fecha}</span>
-        <select class="select-intercambiar" data-dia="${dia}"><option value="">🔀 Cambiar día</option>${opcionesIntercambio}</select>
+        <select class="select-intercambiar" data-dia="${dia}"><option value="">Cambiar día…</option>${opcionesIntercambio}</select>
       </div>
       ${cole}
       ${bloqueCasaHTML(dia, "comida", menuActualDias?.[dia]?.comida, true)}
@@ -1081,6 +1171,11 @@ function renderMenuGrid() {
   }).join("");
 
   grid.innerHTML = cabecera + filas;
+
+  // Cada día ocupa 4 celdas (día, cole, comida, cena) tras las 4 de cabecera;
+  // se marcan con su día para poder mostrar un solo día en el móvil.
+  [...grid.children].slice(4).forEach((celda, i) => (celda.dataset.dia = DIAS[Math.floor(i / 4)]));
+  renderTiraDias();
 
   grid.querySelectorAll(".btn-quitar-plato").forEach((btn) => {
     btn.addEventListener("click", () => ponerPlato(btn.dataset.dia, btn.dataset.comida, btn.dataset.curso, null));
@@ -1254,7 +1349,7 @@ function renderInventarioList() {
   const filtrados = inventarioCache.filter((i) => !texto || i.nombre.toLowerCase().includes(texto));
 
   if (filtrados.length === 0) {
-    contenedor.innerHTML = `<div class="empty-state"><span class="empty-emoji">🧺</span><p>${inventarioCache.length === 0 ? "El inventario está vacío." : "No hay productos que coincidan."}</p></div>`;
+    contenedor.innerHTML = `<div class="empty-state"><span class="empty-icono">${icono("nevera")}</span><p>${inventarioCache.length === 0 ? "El inventario está vacío." : "No hay productos que coincidan."}</p></div>`;
     return;
   }
 
@@ -1278,8 +1373,8 @@ function renderInventarioList() {
           ${detalle ? `<div class="plato-meta hint">${detalle}</div>` : ""}
         </div>
         <div class="plato-actions">
-          <button data-action="editar" class="btn-ghost btn-small">Editar</button>
-          <button data-action="borrar" class="btn-ghost btn-small">Borrar</button>
+          <button data-action="editar" title="Editar">${icono("lapiz")}</button>
+          <button data-action="borrar" title="Borrar">${icono("papelera")}</button>
         </div>
       `;
       li.querySelector('[data-action="editar"]').addEventListener("click", () => cargarItemEnForm(item));
@@ -1378,18 +1473,22 @@ function renderListaCompra() {
   for (const e of entradas) if (!SECCIONES.some((s) => s.id === e.seccion)) e.seccion = "otros";
 
   if (entradas.length === 0) {
-    cont.innerHTML = `<div class="empty-state"><span class="empty-emoji">🛒</span><p>No hay nada que comprar: no hay menú esta semana o sus platos no tienen ingredientes.</p></div>`;
+    cont.innerHTML = `<div class="empty-state"><span class="empty-icono">${icono("carrito")}</span><p>No hay nada que comprar: no hay menú esta semana o sus platos no tienen ingredientes.</p></div>`;
     return;
   }
 
-  const pendientes = entradas.filter((e) => !e.cubierto && !compraDoc.marcados[e.clave]).length;
+  const hecho = (e) => e.cubierto || !!compraDoc.marcados[e.clave];
+  const listos = entradas.filter(hecho).length;
+  const porcentaje = Math.round((listos / entradas.length) * 100);
   const opcionesSeccion = SECCIONES.map((s) => `<option value="${s.id}">${s.icono} ${s.nombre}</option>`).join("");
-  let html = `<p class="compra-resumen">${pendientes} por comprar · ${entradas.length} en total</p>`;
+  let html = `
+    <p class="compra-resumen"><span><strong>${listos}</strong> de ${entradas.length} listos</span><span>${entradas.length - listos} por comprar</span></p>
+    <div class="compra-progreso"><span style="width:${porcentaje}%"></span></div>`;
 
   for (const seccion of SECCIONES) {
     const items = entradas
       .filter((e) => e.seccion === seccion.id)
-      .sort((a, b) => Number(a.cubierto) - Number(b.cubierto) || a.nombre.localeCompare(b.nombre, "es"));
+      .sort((a, b) => Number(hecho(a)) - Number(hecho(b)) || a.nombre.localeCompare(b.nombre, "es"));
     if (!items.length) continue;
     html += `<section class="compra-seccion"><h3 class="compra-seccion-titulo">${seccion.icono} ${seccion.nombre} <span class="hint">(${items.length})</span></h3><ul class="compra-lista">`;
     for (const e of items) {
@@ -1422,6 +1521,8 @@ function renderListaCompra() {
       compraDoc.marcados[entrada.clave] = ev.target.checked;
       li.classList.toggle("comprado", ev.target.checked);
       guardarListaCompra(compraSemanaId, compraDoc);
+      // Breve pausa para que se vea el check antes de que baje al final.
+      setTimeout(renderListaCompra, 350);
     });
   });
   cont.querySelectorAll("[data-extra]").forEach((btn) => {
@@ -1715,6 +1816,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initMenuEscolarPersistence();
   buildFiltroCategoriaChips();
   initNavegadorSemanas();
+  initDeslizarDias();
   initFormPlato();
   initFormConfig();
   initGenerarMenu();
@@ -1744,4 +1846,29 @@ window.importarSeed = async function importarSeed() {
   console.log(`Importados ${platos.length} platos.`);
 };
 
+// ---------- Tema claro / oscuro ----------
+function temaActual() {
+  const forzado = document.documentElement.dataset.theme;
+  if (forzado) return forzado;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
+function pintarBotonTema() {
+  const oscuro = temaActual() === "dark";
+  document.documentElement.classList.toggle("tema-oscuro", oscuro);
+  const btn = document.getElementById("btn-tema");
+  if (btn) btn.title = oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+}
+
+function initTema() {
+  pintarBotonTema();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", pintarBotonTema);
+  document.getElementById("btn-tema")?.addEventListener("click", () => {
+    const nuevo = temaActual() === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = nuevo;
+    try { localStorage.setItem("fame-tema", nuevo); } catch (e) {}
+    pintarBotonTema();
+  });
+}
+
+initTema();
