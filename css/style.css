@@ -111,6 +111,13 @@
 .tema-oscuro .btn-tema .ic-luna { display: none; }
 [hidden] { display: none !important; }
 
+/* Transición al cambiar de pantalla deslizando */
+@keyframes entra-der { from { opacity: 0.4; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes entra-izq { from { opacity: 0.4; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+.entra-desde-der { animation: entra-der 0.22s ease-out; }
+.entra-desde-izq { animation: entra-izq 0.22s ease-out; }
+@media (prefers-reduced-motion: reduce) { .entra-desde-der, .entra-desde-izq { animation: none; } }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
