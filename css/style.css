@@ -423,6 +423,67 @@ details[open] > summary::after { transform: rotate(-135deg); }
 .chip-filtro.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
 .platos-seccion, .compra-seccion { margin-bottom: 1.4rem; }
+
+/* Selector de dos opciones (p. ej. agrupar el inventario) */
+.segmentado {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.segmentado button {
+  border: none;
+  background: none;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--muted);
+  min-height: 0;
+}
+.segmentado button.active { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+
+/* Inventario: grupos por ubicación y fila con − cantidad + */
+.inv-ubicacion { margin-bottom: 1.8rem; }
+.inv-ubicacion-titulo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 0.7rem 0.25rem;
+}
+.inv-ubicacion .platos-seccion { margin-bottom: 0.9rem; }
+.inv-item .inv-info { flex: 1; min-width: 0; }
+.inv-item .inv-info strong { display: block; overflow-wrap: anywhere; line-height: 1.3; }
+#tab-inventario .platos-toolbar .buscador { flex: 1 1 100%; }
+.inv-stepper {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card-2);
+}
+.inv-stepper button {
+  width: 2rem;
+  height: 2rem;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--accent);
+}
+.inv-stepper button:hover { background: var(--accent-soft); }
+.inv-cantidad { min-width: 3.9rem; text-align: center; font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.inv-item .plato-actions { margin-left: -0.3rem; }
+.inv-item .plato-actions button { min-width: 1.9rem; padding: 0 0.3rem; }
+.inv-agotado .inv-info strong { color: var(--muted); text-decoration: line-through; }
+.inv-agotado .inv-cantidad { color: var(--error); }
 .platos-seccion-titulo, .compra-seccion-titulo {
   display: flex;
   align-items: center;
