@@ -218,6 +218,25 @@
           <button type="button" id="btn-add-regla" class="btn-ghost btn-small"><svg class="ic"><use href="#i-mas"/></svg> Añadir regla</button>
         </fieldset>
 
+        <fieldset>
+          <legend>Criterios del menú</legend>
+          <label class="criterio">
+            <input type="checkbox" id="cfg-comida-como-cole" />
+            <span><strong>La comida en casa se parece a la del cole</strong>
+              <small class="hint">Preferencia: cada plato de la misma categoría que el del cole ese día (legumbre, pescado…).</small></span>
+          </label>
+          <label class="criterio">
+            <input type="checkbox" id="cfg-cena-complementaria" />
+            <span><strong>La cena complementa lo comido a mediodía</strong>
+              <small class="hint">Regla: tras legumbre, pasta o arroz, verdura o ensalada; tras verdura, hidratos o legumbre; carne, pescado y huevo se alternan; tras fruta, fruta o lácteo. Mediodía es el menú del cole si lo hay; si no, la comida de casa.</small></span>
+          </label>
+          <label class="criterio">
+            <input type="checkbox" id="cfg-cenas-rapidas" />
+            <span><strong>Cenas rápidas</strong>
+              <small class="hint">Preferencia: platos marcados como «Rápido» y, si no hay, evita los «Largo».</small></span>
+          </label>
+        </fieldset>
+
         <label>No repetir el mismo plato antes de (semanas)
           <input type="number" id="cfg-semanas-sin-repetir" min="0" max="12" value="3" />
         </label>
@@ -359,6 +378,7 @@
       </label>
       <div class="modal-actions">
         <button id="foto-cancelar" class="btn-ghost">Cancelar</button>
+        <button id="foto-reintentar" class="btn-ghost" hidden>Reintentar</button>
         <button id="foto-guardar" class="btn-primary" disabled>Añadir al inventario</button>
       </div>
     </div>
