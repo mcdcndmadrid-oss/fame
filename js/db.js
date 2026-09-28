@@ -76,10 +76,6 @@ export async function borrarPlato(id) {
   escribir(deleteDoc(doc(db, "platos", id)));
 }
 
-export async function marcarPlatoUsado(id, fechaISO) {
-  escribir(updateDoc(doc(db, "platos", id), { ultimaVez: fechaISO }));
-}
-
 // --- Configuración / restricciones ---
 
 const CONFIG_DOC = doc(db, "config", "restricciones");

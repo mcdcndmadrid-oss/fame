@@ -5,7 +5,6 @@ import {
   listarPlatos,
   guardarPlato,
   borrarPlato,
-  marcarPlatoUsado,
   obtenerRestricciones,
   guardarRestricciones,
   obtenerMenu,
@@ -25,6 +24,7 @@ import {
   CURSOS,
   CURSO_POR_CATEGORIA,
   ESTRUCTURA_POR_DEFECTO,
+  CRITERIOS_POR_DEFECTO,
   cursoDePlato,
   comidaVacia,
 } from "./generator.js";
@@ -225,6 +225,7 @@ function migrarRestricciones(cfg) {
     comida: { ...ESTRUCTURA_POR_DEFECTO.comida, ...cfg.estructura?.comida },
     cena: { ...ESTRUCTURA_POR_DEFECTO.cena, ...cfg.estructura?.cena },
   };
+  out.criterios = { ...CRITERIOS_POR_DEFECTO, ...cfg.criterios };
   return out;
 }
 
@@ -433,6 +434,7 @@ function restriccionesPorDefecto() {
     semanasSinRepetir: 3,
     diasEspeciales,
     estructura: structuredClone(ESTRUCTURA_POR_DEFECTO),
+    criterios: { ...CRITERIOS_POR_DEFECTO },
   };
 }
 
@@ -847,6 +849,10 @@ function resetReglas(reglas) {
 function renderConfigForm() {
   const cfg = restriccionesCache || restriccionesPorDefecto();
   document.getElementById("cfg-semanas-sin-repetir").value = cfg.semanasSinRepetir;
+  const criterios = { ...CRITERIOS_POR_DEFECTO, ...cfg.criterios };
+  document.getElementById("cfg-comida-como-cole").checked = criterios.comidaComoCole;
+  document.getElementById("cfg-cena-complementaria").checked = criterios.cenaComplementaria;
+  document.getElementById("cfg-cenas-rapidas").checked = criterios.cenasRapidas;
   resetReglas(cfg.reglasCategoria);
   document.querySelectorAll("#dias-especiales-tabla input[type=checkbox]").forEach((input) => {
     const { dia, comida } = input.dataset;
@@ -883,6 +889,11 @@ function initFormConfig() {
       semanasSinRepetir: Number(document.getElementById("cfg-semanas-sin-repetir").value),
       diasEspeciales,
       estructura: leerEstructura(),
+      criterios: {
+        comidaComoCole: document.getElementById("cfg-comida-como-cole").checked,
+        cenaComplementaria: document.getElementById("cfg-cena-complementaria").checked,
+        cenasRapidas: document.getElementById("cfg-cenas-rapidas").checked,
+      },
     };
     await guardarRestricciones(restriccionesCache);
     showToast("Restricciones guardadas.", "success");
@@ -1301,6 +1312,24 @@ function ocultarAvisos() {
   document.getElementById("menu-avisos").hidden = true;
 }
 
+// Cuántas semanas hace que salió cada plato (1 = la semana anterior), según
+// los menús guardados. La semana que se genera no cuenta, así que regenerarla
+// no penaliza los platos descartados, y los cambios hechos a mano sí cuentan.
+async function historialDePlatos(semanaId, semanas) {
+  const menus = await Promise.all(
+    Array.from({ length: semanas }, (_, i) => obtenerMenuNormalizado(sumarDias(semanaId, -7 * (i + 1))).catch(() => null))
+  );
+  const hace = {};
+  menus.forEach((menu, i) => {
+    for (const dia of DIAS) {
+      for (const comida of COMIDAS) {
+        for (const id of idsDeComida(menu?.dias?.[dia]?.[comida])) if (!(id in hace)) hace[id] = i + 1;
+      }
+    }
+  });
+  return hace;
+}
+
 function initGenerarMenu() {
   document.getElementById("btn-generar").addEventListener("click", async () => {
     if (!restriccionesCache) restriccionesCache = restriccionesPorDefecto();
@@ -1314,19 +1343,10 @@ function initGenerarMenu() {
     }
 
     const menuEscolar = leerMenuEscolar();
-    const { dias, warnings } = generarMenu(platosCache, restriccionesCache, menuEscolar, semanaId);
+    const historial = await historialDePlatos(semanaId, Math.max(8, restriccionesCache.semanasSinRepetir ?? 3));
+    const { dias, warnings } = generarMenu(platosCache, restriccionesCache, menuEscolar, semanaId, historial);
     menuActualDias = dias;
     await guardarMenu(semanaId, { dias, menuEscolar });
-
-    for (const [idx, dia] of DIAS.entries()) {
-      const fechaISO = sumarDias(semanaId, idx);
-      for (const comida of COMIDAS) {
-        for (const platoId of idsDeComida(dias[dia][comida])) {
-          await marcarPlatoUsado(platoId, fechaISO);
-        }
-      }
-    }
-    platosCache = await listarPlatos();
     renderMenuGrid();
     renderResumenCuotas(dias);
     mostrarAvisos(warnings);
@@ -1793,10 +1813,17 @@ function initFotoAlimentos() {
     if (input.files?.[0]) reconocerFoto(input.files[0]);
   });
   document.getElementById("foto-cancelar").addEventListener("click", cerrarFotoModal);
+  document.getElementById("foto-reintentar").addEventListener("click", () => {
+    if (ultimaFotoAlimentos) reconocerFoto(ultimaFotoAlimentos);
+  });
   document.getElementById("foto-guardar").addEventListener("click", guardarAlimentosDeFoto);
 }
 
+// La última foto enviada, para poder reintentar sin volver a sacarla.
+let ultimaFotoAlimentos = null;
+
 function cerrarFotoModal() {
+  ultimaFotoAlimentos = null;
   document.getElementById("foto-modal").hidden = true;
   document.getElementById("foto-resultados").innerHTML = "";
 }
@@ -1818,8 +1845,11 @@ async function reconocerFoto(archivo) {
   const estado = document.getElementById("foto-estado");
   const resultados = document.getElementById("foto-resultados");
   const guardar = document.getElementById("foto-guardar");
+  const reintentar = document.getElementById("foto-reintentar");
+  ultimaFotoAlimentos = archivo;
   resultados.innerHTML = "";
   guardar.disabled = true;
+  reintentar.hidden = true;
   document.getElementById("foto-ubicacion-fila").hidden = true;
   estado.textContent = "Reconociendo alimentos…";
   document.getElementById("foto-modal").hidden = false;
@@ -1837,6 +1867,7 @@ async function reconocerFoto(archivo) {
     alimentos = datos.alimentos || [];
   } catch (e) {
     estado.textContent = `No se ha podido reconocer la foto: ${e.message}`;
+    reintentar.hidden = false;
     return;
   }
 

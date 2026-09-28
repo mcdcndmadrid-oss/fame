@@ -53,27 +53,42 @@ function construirSlots(diasEspeciales, estructura) {
   return slots;
 }
 
-function semanasDesde(fechaISO, semanaInicioISO) {
-  if (!fechaISO) return Infinity;
-  const dias = (new Date(semanaInicioISO) - new Date(fechaISO)) / 86400000;
-  return dias / 7;
-}
+// Criterios que se pueden activar o desactivar en Reglas (activos por defecto).
+export const CRITERIOS_POR_DEFECTO = {
+  comidaComoCole: true, // la comida de casa se parece (en categorías) a la del cole ese día
+  cenaComplementaria: true, // la cena complementa lo comido a mediodía
+  cenasRapidas: true, // en la cena, mejor platos rápidos
+};
 
-function elegible(plato, semanaInicioISO, semanasSinRepetir) {
-  return semanasDesde(plato.ultimaVez, semanaInicioISO) >= semanasSinRepetir;
-}
+// Qué categorías complementan en la cena lo comido a mediodía, plato a plato:
+// tras legumbre o hidratos, verdura; tras verdura, hidratos o legumbre; en el
+// segundo se alterna carne, pescado y huevo; y en el postre, fruta o lácteo.
+// Una categoría sin entrada (p. ej. "otro") no limita la cena.
+export const COMPLEMENTO_CENA = {
+  legumbre: ["verdura", "ensalada"],
+  pasta: ["verdura", "ensalada"],
+  arroz: ["verdura", "ensalada"],
+  verdura: ["pasta", "arroz", "legumbre", "ensalada"],
+  ensalada: ["verdura", "pasta", "arroz", "legumbre"],
+  carne: ["pescado", "huevo"],
+  pescado: ["huevo", "carne"],
+  huevo: ["pescado", "carne"],
+  fruta: ["fruta", "lacteo"],
+  lacteo: ["fruta"],
+  postre: ["fruta", "lacteo"],
+};
 
 // Ordena primero por favorito (los favoritos entran antes en la lista de
 // candidatos, lo que sesga su probabilidad de ser elegidos) y dentro de
-// cada grupo por antigüedad de uso.
-function ordenarPorAntiguedad(platos) {
+// cada grupo por antigüedad de uso (los que hace más semanas que no salen).
+function ordenarPorAntiguedad(platos, hace) {
   return [...platos].sort((a, b) => {
     const favA = a.favorito ? 0 : 1;
     const favB = b.favorito ? 0 : 1;
     if (favA !== favB) return favA - favB;
-    const fa = a.ultimaVez ? new Date(a.ultimaVez).getTime() : -Infinity;
-    const fb = b.ultimaVez ? new Date(b.ultimaVez).getTime() : -Infinity;
-    return fa - fb;
+    const ha = hace(a);
+    const hb = hace(b);
+    return ha === hb ? 0 : hb > ha ? 1 : -1;
   });
 }
 
@@ -89,26 +104,35 @@ function shuffle(arr) {
 const NOMBRE_CURSO = { primero: "primer plato", segundo: "segundo plato", postre: "postre" };
 
 /**
- * @param {Array} platos catálogo completo {id, nombre, categoria, curso, ultimaVez}
+ * @param {Array} platos catálogo completo {id, nombre, categoria, curso, tiempoPrep, favorito}
  * @param {Object} restricciones {
  *   reglasCategoria: [{ categoria, minPorSemana, maxPorSemana }],
  *   semanasSinRepetir,
  *   diasEspeciales: { lunes: { comida: bool, cena: bool }, ... },
  *   estructura: { comida: { primero, segundo, postre }, cena: { ... } },
+ *   criterios: { comidaComoCole, cenaComplementaria, cenasRapidas },
  * }
- * @param {Object} menuEscolar { lunes: { primero, segundo, postre }, ... } lo que sirve el cole cada día
+ * @param {Object} menuEscolar { lunes: { primero: {nombre, categoria}, segundo, postre }, ... }
  * @param {string} semanaInicioISO fecha (YYYY-MM-DD) del lunes de la semana a generar
+ * @param {Object} historial { platoId: semanas que hace que se usó (1 = la semana anterior) },
+ *   sacado de los menús guardados de semanas anteriores (nunca de la que se genera)
  * @returns {{ dias: Object, warnings: string[] }}
  *
- * Las reglas se cumplen siempre que sea posible. Si en un hueco no hay ningún
- * plato que las cumpla todas, se van relajando de la menos a la más
- * prioritaria (orden de REGLAS, de abajo arriba) y se avisa de cada una que
- * haya habido que saltarse y dónde.
+ * Hay dos tipos de criterios:
+ * - REGLAS: se cumplen siempre que sea posible. Si en un hueco no hay ningún
+ *   plato que las cumpla todas, se van relajando de la menos a la más
+ *   prioritaria (orden de REGLAS, de abajo arriba) y se avisa de cada una que
+ *   haya habido que saltarse y dónde.
+ * - PREFERENCIAS: entre los platos que cumplen las reglas, se prefieren los
+ *   que las cumplen; si ninguno las cumple, se ignoran sin avisar.
  */
-export function generarMenu(platos, restricciones, menuEscolar, semanaInicioISO) {
+export function generarMenu(platos, restricciones, menuEscolar, semanaInicioISO, historial = {}) {
   const semanasSinRepetir = restricciones.semanasSinRepetir ?? 3;
+  const criterios = { ...CRITERIOS_POR_DEFECTO, ...restricciones.criterios };
   const slots = construirSlots(restricciones.diasEspeciales, restricciones.estructura);
   const dias = Object.fromEntries(DIAS.map((d) => [d, { comida: comidaVacia(), cena: comidaVacia() }]));
+  const categoriaDe = Object.fromEntries(platos.map((p) => [p.id, p.categoria]));
+  const hace = (p) => historial[p.id] ?? Infinity;
 
   const usosSemana = {};
   const contadorCategoria = {};
@@ -120,14 +144,18 @@ export function generarMenu(platos, restricciones, menuEscolar, semanaInicioISO)
       .map((r) => [r.categoria, Number(r.maxPorSemana)])
   );
 
-  // Categorías que el cole sirve ese día. menuEscolar[dia] puede venir como
-  // string (esquema antiguo), { categoria, texto } o { primero, segundo, postre }.
-  function categoriasEscolar(dia) {
+  // Categoría del plato que sirve el cole ese día en ese curso (o null).
+  function categoriaCole(dia, curso) {
     const valor = menuEscolar?.[dia];
-    if (!valor) return new Set();
-    if (typeof valor === "string") return new Set([valor]);
-    return new Set([valor.categoria, valor.primero?.categoria, valor.segundo?.categoria].filter((c) => c && c !== "otro"));
+    return (valor && typeof valor === "object" && valor[curso]?.categoria) || null;
   }
+  // Lo comido a mediodía ese día en ese curso: el cole si hay menú escolar;
+  // si no, la comida de casa (si ya está puesta).
+  function mediodia(dia, curso) {
+    return categoriaCole(dia, curso) || categoriaDe[dias[dia].comida[curso]] || null;
+  }
+  const complementa = (deMediodia, deCena) =>
+    !deMediodia || !deCena || !COMPLEMENTO_CENA[deMediodia] || COMPLEMENTO_CENA[deMediodia].includes(deCena);
 
   // De más a menos prioritaria.
   const REGLAS = [
@@ -138,27 +166,60 @@ export function generarMenu(platos, restricciones, menuEscolar, semanaInicioISO)
     { nombre: "no repetir plato en la misma semana", cumple: (p) => !usosSemana[p.id] },
     {
       nombre: `no repetir plato de las últimas ${semanasSinRepetir} semanas`,
-      cumple: (p) => elegible(p, semanaInicioISO, semanasSinRepetir),
+      cumple: (p) => hace(p) > semanasSinRepetir,
     },
-    { nombre: "no coincidir con lo que come en el cole ese día", cumple: (p, slot) => !categoriasEscolar(slot.dia).has(p.categoria) },
   ];
+  if (criterios.cenaComplementaria) {
+    REGLAS.push({
+      nombre: "la cena complementa lo comido a mediodía",
+      cumple: (p, slot) =>
+        slot.comida === "cena"
+          ? complementa(mediodia(slot.dia, slot.curso), p.categoria)
+          : // Sin cole, la comida de casa es la referencia de la cena: si la cena
+            // ya está puesta, la comida tiene que casar con ella.
+            categoriaCole(slot.dia, slot.curso) || complementa(p.categoria, categoriaDe[dias[slot.dia].cena[slot.curso]]),
+    });
+  }
+
+  // En orden: cada una afina la lista que deja la anterior.
+  const PREFERENCIAS = [];
+  if (criterios.comidaComoCole) {
+    PREFERENCIAS.push((p, slot) => {
+      const cole = slot.comida === "comida" && categoriaCole(slot.dia, slot.curso);
+      return !cole || p.categoria === cole;
+    });
+  }
+  if (criterios.cenasRapidas) {
+    PREFERENCIAS.push((p, slot) => slot.comida !== "cena" || p.tiempoPrep !== "largo");
+    PREFERENCIAS.push((p, slot) => slot.comida !== "cena" || p.tiempoPrep === "rapido");
+  }
 
   const forzadas = new Map(); // nombre de regla -> huecos donde se ha saltado
   const avisos = [];
   const describir = (s) => `${s.dia} ${s.comida} (${NOMBRE_CURSO[s.curso]})`;
 
-  // Platos del curso del hueco que cumplen el máximo número de reglas posible.
+  // Platos del curso del hueco que cumplen el máximo número de reglas posible
+  // y, entre ellos, las preferencias que se puedan.
   function mejoresCandidatos(slot, filtro = () => true) {
     const base = platos.filter((p) => cursoDePlato(p) === slot.curso && filtro(p));
     for (let activas = REGLAS.length; activas >= 0; activas--) {
-      const lista = base.filter((p) => REGLAS.slice(0, activas).every((r) => r.cumple(p, slot)));
-      if (lista.length) return { lista, reglasCumplidas: activas };
+      let lista = base.filter((p) => REGLAS.slice(0, activas).every((r) => r.cumple(p, slot)));
+      if (!lista.length) continue;
+      let preferencias = 0;
+      for (const pref of PREFERENCIAS) {
+        const afinada = lista.filter((p) => pref(p, slot));
+        if (afinada.length) {
+          lista = afinada;
+          preferencias++;
+        }
+      }
+      return { lista, reglasCumplidas: activas, preferencias };
     }
-    return { lista: [], reglasCumplidas: -1 };
+    return { lista: [], reglasCumplidas: -1, preferencias: 0 };
   }
 
   function ordenar(lista) {
-    return ordenarPorAntiguedad(shuffle(lista)).sort((a, b) => (usosSemana[a.id] || 0) - (usosSemana[b.id] || 0));
+    return ordenarPorAntiguedad(shuffle(lista), hace).sort((a, b) => (usosSemana[a.id] || 0) - (usosSemana[b.id] || 0));
   }
 
   function asignar(slot, lista) {
@@ -176,16 +237,25 @@ export function generarMenu(platos, restricciones, menuEscolar, semanaInicioISO)
     contadorCategoria[plato.categoria] = (contadorCategoria[plato.categoria] || 0) + 1;
   }
 
-  let libres = shuffle(slots);
+  // Las comidas antes que las cenas: así la cena ya sabe qué se ha comido.
+  let libres = shuffle(slots).sort((a, b) => COMIDAS.indexOf(a.comida) - COMIDAS.indexOf(b.comida));
 
-  // 1) Mínimos por categoría: en el hueco donde ese plato rompa menos reglas.
+  // 1) Mínimos por categoría: en el hueco donde ese plato rompa menos reglas
+  //    y cumpla más preferencias.
   for (const regla of reglasMinimo) {
     let puestos = 0;
     for (let i = 0; i < regla.minPorSemana; i++) {
       let mejor = null;
       libres.forEach((slot, idx) => {
         const r = mejoresCandidatos(slot, (p) => p.categoria === regla.categoria);
-        if (r.lista.length && (!mejor || r.reglasCumplidas > mejor.reglasCumplidas)) mejor = { idx, ...r };
+        if (!r.lista.length) return;
+        if (
+          !mejor ||
+          r.reglasCumplidas > mejor.reglasCumplidas ||
+          (r.reglasCumplidas === mejor.reglasCumplidas && r.preferencias > mejor.preferencias)
+        ) {
+          mejor = { idx, ...r };
+        }
       });
       if (!mejor) break;
       asignar(libres[mejor.idx], mejor.lista);
