@@ -1120,6 +1120,53 @@ function elegirDiaMenu(dia) {
   renderTiraDias();
 }
 
+// ---------- cambiar de pantalla deslizando el dedo (móvil) ----------
+
+function irAPantalla(direccion) {
+  const botones = [...document.querySelectorAll(".tab-btn")];
+  const actual = botones.findIndex((b) => b.classList.contains("active"));
+  const destino = botones[actual + direccion];
+  if (!destino) return;
+  destino.click();
+  window.scrollTo({ top: 0 });
+  const panel = document.getElementById(`tab-${destino.dataset.tab}`);
+  panel.classList.remove("entra-desde-der", "entra-desde-izq");
+  void panel.offsetWidth; // reinicia la animación
+  panel.classList.add(direccion > 0 ? "entra-desde-der" : "entra-desde-izq");
+}
+
+// ¿El gesto empieza en algo que ya usa el dedo en horizontal? (campos,
+// franjas con desplazamiento lateral, el menú por días, ventanas abiertas)
+function gestoReservado(el) {
+  if (document.querySelector(".modal-overlay:not([hidden])")) return true;
+  for (let n = el; n && n !== document.body; n = n.parentElement) {
+    if (n.matches?.("input, textarea, select, #menu-grid, #barcode-reader")) return true;
+    if (n.scrollWidth > n.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(n).overflowX)) return true;
+  }
+  return false;
+}
+
+function initDeslizarPantallas() {
+  const movil = matchMedia("(max-width: 760px)");
+  let inicio = null;
+  document.addEventListener("touchstart", (e) => {
+    inicio = null;
+    if (!movil.matches || e.touches.length !== 1 || document.querySelector(".tabs")?.hidden) return;
+    if (gestoReservado(e.target)) return;
+    inicio = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (!inicio) return;
+    const dx = e.changedTouches[0].clientX - inicio.x;
+    const dy = e.changedTouches[0].clientY - inicio.y;
+    const rapido = Date.now() - inicio.t < 500;
+    inicio = null;
+    // Horizontal claro: largo, o corto pero rápido; y bastante más lateral que vertical.
+    if (Math.abs(dx) < (rapido ? 50 : 90) || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+    irAPantalla(dx < 0 ? 1 : -1);
+  }, { passive: true });
+}
+
 function initDeslizarDias() {
   const grid = document.getElementById("menu-grid");
   let inicioX = null;
@@ -1137,6 +1184,7 @@ function initDeslizarDias() {
     const i = DIAS.indexOf(diaMenuActivo);
     const siguiente = DIAS[Math.min(DIAS.length - 1, Math.max(0, i + (dx < 0 ? 1 : -1)))];
     if (siguiente !== diaMenuActivo) elegirDiaMenu(siguiente);
+    else irAPantalla(dx < 0 ? 1 : -1);
   }, { passive: true });
 }
 
@@ -1414,8 +1462,17 @@ function itemInventarioLi(item, mostrarUbicacion) {
   li.querySelector('[data-action="borrar"]').addEventListener("click", async () => {
     const ok = await confirmDialog(`¿Borrar "${item.nombre}" del inventario?`);
     if (!ok) return;
-    await borrarItemInventario(item.id);
-    inventarioCache = await listarInventario();
+    // Un guardado pendiente de − / + no debe llegar después del borrado.
+    clearTimeout(guardadosPendientesInventario.get(item.id));
+    guardadosPendientesInventario.delete(item.id);
+    try {
+      await borrarItemInventario(item.id);
+    } catch (e) {
+      showToast(`No se ha podido borrar "${item.nombre}": ${e.message}`, "error");
+      return;
+    }
+    // Se quita de la lista al momento, sin esperar a releer del servidor.
+    inventarioCache = inventarioCache.filter((i) => i.id !== item.id);
     renderInventarioList();
     showToast(`"${item.nombre}" borrado.`, "success");
   });
@@ -2025,6 +2082,7 @@ document.addEventListener("DOMContentLoaded", () => {
   buildFiltroCategoriaChips();
   initNavegadorSemanas();
   initDeslizarDias();
+  initDeslizarPantallas();
   initFormPlato();
   initFormConfig();
   initGenerarMenu();

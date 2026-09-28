@@ -65,7 +65,7 @@ const platosCol = collection(db, "platos");
 
 export async function listarPlatos() {
   const snap = await getDocs(platosCol);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id })); // el id real del documento siempre gana
 }
 
 export async function guardarPlato(objeto) {
@@ -113,7 +113,7 @@ const inventarioCol = collection(db, "inventario");
 
 export async function listarInventario() {
   const snap = await getDocs(inventarioCol);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id })); // el id real del documento siempre gana
 }
 
 export async function guardarItemInventario(objeto) {
@@ -131,7 +131,7 @@ const alimentosCol = collection(db, "alimentos");
 
 export async function listarAlimentos() {
   const snap = await getDocs(alimentosCol);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id })); // el id real del documento siempre gana
 }
 
 export async function guardarAlimento(objeto) {
