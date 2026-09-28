@@ -288,6 +288,10 @@
 
       <div class="platos-toolbar">
         <label class="buscador"><svg class="ic"><use href="#i-buscar"/></svg><input type="search" id="filtro-inventario" placeholder="Buscar en el inventario…" /></label>
+        <div class="segmentado" role="group" aria-label="Agrupar inventario">
+          <button type="button" data-agrupar="ubicacion" class="active">Por ubicación</button>
+          <button type="button" data-agrupar="categoria">Por categoría</button>
+        </div>
       </div>
       <div id="lista-inventario"></div>
     </section>
