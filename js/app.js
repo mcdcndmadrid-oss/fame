@@ -36,7 +36,7 @@ import {
   categorizarPlato,
   categorizarPostre,
 } from "./escolar-pdf.js";
-import { SECCIONES, agruparCompra, formatearCantidades } from "./compra.js";
+import { SECCIONES, agruparCompra, formatearCantidades, seccionPorNombre } from "./compra.js";
 import { desdeSchemaOrg, desdeTexto } from "./recetas.js";
 import { RECETAS_PROXY_URL } from "./recetas-config.js";
 
@@ -99,6 +99,9 @@ let menuActualDias = null; // { lunes: { comida: [platoId,...], cena: [...] }, .
 let filtroCategoriaActiva = "";
 let inventarioCache = [];
 let alimentosCache = [];
+let agruparInventario = (() => {
+  try { return localStorage.getItem("fame-agrupar-inventario") || "ubicacion"; } catch (e) { return "ubicacion"; }
+})();
 let html5QrScanner = null;
 let compraSemanaId = null;
 let compraUsos = [];
@@ -1318,6 +1321,14 @@ function initFormInventario() {
 
   document.getElementById("btn-cancelar-inventario").addEventListener("click", resetFormInventario);
   document.getElementById("filtro-inventario").addEventListener("input", renderInventarioList);
+
+  document.querySelectorAll("[data-agrupar]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      agruparInventario = btn.dataset.agrupar;
+      try { localStorage.setItem("fame-agrupar-inventario", agruparInventario); } catch (e) {}
+      renderInventarioList();
+    });
+  });
 }
 
 function resetFormInventario() {
@@ -1340,9 +1351,97 @@ function cargarItemEnForm(item) {
   document.getElementById("inv-nombre").scrollIntoView({ behavior: "smooth" });
 }
 
+function categoriaInventario(item) {
+  const alimento = alimentosCache.find((a) => a.id === item.alimentoId);
+  const id = alimento?.seccion || seccionPorNombre(item.nombre);
+  return SECCIONES.some((s) => s.id === id) ? id : "otros";
+}
+
+// Cuánto suman/restan los botones − y + según la unidad.
+function pasoCantidad(unidad) {
+  const u = (unidad || "").toLowerCase().trim();
+  if (["g", "gr", "gramos", "ml"].includes(u)) return 100;
+  if (["kg", "l", "litro", "litros"].includes(u)) return 0.5;
+  return 1;
+}
+
+function textoCantidad(item) {
+  if (item.cantidad == null) return "–";
+  const n = Math.round(item.cantidad * 100) / 100;
+  return `${n.toLocaleString("es-ES")}${item.unidad ? ` ${item.unidad}` : ""}`;
+}
+
+// Los clics seguidos en − / + se guardan una sola vez al parar.
+const guardadosPendientesInventario = new Map();
+function cambiarCantidadInventario(item, signo, span) {
+  const paso = pasoCantidad(item.unidad);
+  item.cantidad = Math.max(0, Math.round(((item.cantidad || 0) + signo * paso) * 100) / 100);
+  span.textContent = textoCantidad(item);
+  span.closest("li").classList.toggle("inv-agotado", item.cantidad === 0);
+  clearTimeout(guardadosPendientesInventario.get(item.id));
+  guardadosPendientesInventario.set(
+    item.id,
+    setTimeout(() => {
+      guardadosPendientesInventario.delete(item.id);
+      guardarItemInventario({ ...item, actualizado: toISO(new Date()) });
+    }, 600)
+  );
+}
+
+function itemInventarioLi(item, mostrarUbicacion) {
+  const meta = [mostrarUbicacion ? UBICACION_LABEL[item.ubicacion] || "" : "", item.detalle || ""].filter(Boolean).join(" · ");
+  const li = document.createElement("li");
+  li.className = "inv-item" + (item.cantidad === 0 ? " inv-agotado" : "");
+  li.innerHTML = `
+    <div class="inv-info">
+      <strong>${escapeHTML(item.nombre)}</strong>
+      ${meta ? `<div class="plato-meta hint">${escapeHTML(meta)}</div>` : ""}
+    </div>
+    <div class="inv-stepper">
+      <button type="button" data-action="menos" title="Quitar" aria-label="Quitar">−</button>
+      <span class="inv-cantidad">${escapeHTML(textoCantidad(item))}</span>
+      <button type="button" data-action="mas" title="Añadir" aria-label="Añadir">+</button>
+    </div>
+    <div class="plato-actions">
+      <button data-action="editar" title="Editar">${icono("lapiz")}</button>
+      <button data-action="borrar" title="Borrar">${icono("papelera")}</button>
+    </div>
+  `;
+  const span = li.querySelector(".inv-cantidad");
+  li.querySelector('[data-action="menos"]').addEventListener("click", () => cambiarCantidadInventario(item, -1, span));
+  li.querySelector('[data-action="mas"]').addEventListener("click", () => cambiarCantidadInventario(item, 1, span));
+  li.querySelector('[data-action="editar"]').addEventListener("click", () => cargarItemEnForm(item));
+  li.querySelector('[data-action="borrar"]').addEventListener("click", async () => {
+    const ok = await confirmDialog(`¿Borrar "${item.nombre}" del inventario?`);
+    if (!ok) return;
+    await borrarItemInventario(item.id);
+    inventarioCache = await listarInventario();
+    renderInventarioList();
+    showToast(`"${item.nombre}" borrado.`, "success");
+  });
+  return li;
+}
+
+// Bloques por categoría (en el orden de las secciones del súper).
+function bloquesPorCategoria(items, mostrarUbicacion) {
+  const frag = document.createDocumentFragment();
+  for (const sec of SECCIONES) {
+    const deSec = items.filter((i) => categoriaInventario(i) === sec.id).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    if (!deSec.length) continue;
+    const bloque = document.createElement("div");
+    bloque.className = "platos-seccion";
+    bloque.innerHTML = `<h4 class="platos-seccion-titulo">${sec.icono} ${sec.nombre} <span class="hint">(${deSec.length})</span></h4><ul class="platos-lista"></ul>`;
+    const ul = bloque.querySelector("ul");
+    for (const item of deSec) ul.appendChild(itemInventarioLi(item, mostrarUbicacion));
+    frag.appendChild(bloque);
+  }
+  return frag;
+}
+
 function renderInventarioList() {
   const contenedor = document.getElementById("lista-inventario");
   if (!contenedor) return;
+  document.querySelectorAll("[data-agrupar]").forEach((b) => b.classList.toggle("active", b.dataset.agrupar === agruparInventario));
   const texto = document.getElementById("filtro-inventario").value.trim().toLowerCase();
   contenedor.innerHTML = "";
 
@@ -1353,42 +1452,21 @@ function renderInventarioList() {
     return;
   }
 
-  for (const ubic of Object.keys(UBICACION_LABEL)) {
-    const items = filtrados.filter((i) => i.ubicacion === ubic).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  if (agruparInventario === "categoria") {
+    contenedor.appendChild(bloquesPorCategoria(filtrados, true));
+    return;
+  }
+
+  const ubicaciones = Object.keys(UBICACION_LABEL);
+  for (const ubic of ubicaciones) {
+    // Lo que no tenga ubicación conocida se muestra con la primera (nevera).
+    const items = filtrados.filter((i) => (ubicaciones.includes(i.ubicacion) ? i.ubicacion : ubicaciones[0]) === ubic);
     if (items.length === 0) continue;
-
-    const seccion = document.createElement("section");
-    seccion.className = "platos-seccion";
-    seccion.innerHTML = `<h3 class="platos-seccion-titulo">${UBICACION_LABEL[ubic]} <span class="hint">(${items.length})</span></h3><ul class="platos-lista"></ul>`;
-    const ul = seccion.querySelector("ul");
-
-    for (const item of items) {
-      const detalle = [item.cantidad != null ? `${item.cantidad} ${item.unidad || ""}`.trim() : "", item.detalle || ""]
-        .filter(Boolean)
-        .join(" · ");
-      const li = document.createElement("li");
-      li.innerHTML = `
-        <div>
-          <strong>${item.nombre}</strong>
-          ${detalle ? `<div class="plato-meta hint">${detalle}</div>` : ""}
-        </div>
-        <div class="plato-actions">
-          <button data-action="editar" title="Editar">${icono("lapiz")}</button>
-          <button data-action="borrar" title="Borrar">${icono("papelera")}</button>
-        </div>
-      `;
-      li.querySelector('[data-action="editar"]').addEventListener("click", () => cargarItemEnForm(item));
-      li.querySelector('[data-action="borrar"]').addEventListener("click", async () => {
-        const ok = await confirmDialog(`¿Borrar "${item.nombre}" del inventario?`);
-        if (!ok) return;
-        await borrarItemInventario(item.id);
-        inventarioCache = await listarInventario();
-        renderInventarioList();
-        showToast(`"${item.nombre}" borrado.`, "success");
-      });
-      ul.appendChild(li);
-    }
-    contenedor.appendChild(seccion);
+    const grupo = document.createElement("section");
+    grupo.className = "inv-ubicacion";
+    grupo.innerHTML = `<h3 class="inv-ubicacion-titulo">${UBICACION_LABEL[ubic]} <span class="hint">${items.length}</span></h3>`;
+    grupo.appendChild(bloquesPorCategoria(items, false));
+    contenedor.appendChild(grupo);
   }
 }
 
