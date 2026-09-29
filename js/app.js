@@ -39,6 +39,18 @@ import {
 import { SECCIONES, agruparCompra, formatearCantidades, seccionPorNombre } from "./compra.js";
 import { desdeSchemaOrg, desdeTexto } from "./recetas.js";
 import { RECETAS_PROXY_URL } from "./recetas-config.js";
+import {
+  almacenDeCodigoPostal,
+  cargarCatalogo,
+  buscarProductos,
+  envasesNecesarios,
+  formatoProducto,
+  precioReferencia,
+  urlProducto,
+  urlFoto,
+  euros,
+  textoFalta,
+} from "./mercadona.js";
 
 const DIA_LABEL = {
   lunes: "Lunes",
@@ -1621,9 +1633,244 @@ function notaEntrada(e) {
   return partes.join(" ");
 }
 
+// ---------- comprar online: enlace a la búsqueda de cada producto ----------
+
+// Solo supermercados que venden alimentación online y aceptan la búsqueda en
+// la dirección (Lidl no vende comida online en España).
+const TIENDAS_ONLINE = {
+  mercadona: { nombre: "Mercadona", buscar: (q) => `https://tienda.mercadona.es/search-results?query=${encodeURIComponent(q)}` },
+  dia: { nombre: "DIA", buscar: (q) => `https://www.dia.es/search?q=${encodeURIComponent(q)}` },
+};
+
+let tiendaOnline = (() => {
+  try { return localStorage.getItem("fame-tienda-online") || ""; } catch (e) { return ""; }
+})();
+
+function initTiendaOnline() {
+  const pintar = () =>
+    document.querySelectorAll("[data-tienda]").forEach((b) => b.classList.toggle("active", b.dataset.tienda === tiendaOnline));
+  document.querySelectorAll("[data-tienda]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      tiendaOnline = btn.dataset.tienda;
+      try { localStorage.setItem("fame-tienda-online", tiendaOnline); } catch (e) {}
+      pintar();
+      renderListaCompra();
+    });
+  });
+  pintar();
+  initMercadona();
+}
+
+// ---------- Mercadona: producto concreto de cada alimento, envases y total ----------
+
+let catalogoMercadona = null; // { productos, porId, fecha }
+let cargandoMercadona = null; // promesa en curso
+let errorMercadona = "";
+const leerLocal = (clave) => {
+  try { return localStorage.getItem(clave) || ""; } catch (e) { return ""; }
+};
+const guardarLocal = (clave, valor) => {
+  try { localStorage.setItem(clave, valor); } catch (e) {}
+};
+
+function initMercadona() {
+  document.getElementById("merc-cancelar").addEventListener("click", cerrarSelectorMercadona);
+  document.getElementById("merc-buscar").addEventListener("input", pintarResultadosMercadona);
+  document.getElementById("merc-quitar").addEventListener("click", () => {
+    if (entradaMercadona) elegirProductoMercadona(entradaMercadona, null);
+  });
+}
+
+async function asegurarCatalogoMercadona({ forzar = false } = {}) {
+  const wh = leerLocal("fame-mercadona-wh");
+  if (!wh || !RECETAS_PROXY_URL) return null;
+  if (catalogoMercadona && !forzar && catalogoMercadona.wh === wh) return catalogoMercadona;
+  if (cargandoMercadona) return cargandoMercadona;
+  errorMercadona = "";
+  renderPanelMercadona();
+  cargandoMercadona = cargarCatalogo(RECETAS_PROXY_URL, wh, { forzar })
+    .then(({ productos, fecha }) => {
+      catalogoMercadona = { wh, productos, fecha, porId: new Map(productos.map((p) => [p.id, p])) };
+      return catalogoMercadona;
+    })
+    .catch((e) => {
+      errorMercadona = e.message;
+      return null;
+    })
+    .finally(() => {
+      cargandoMercadona = null;
+      renderListaCompra();
+      if (!document.getElementById("mercadona-modal").hidden) pintarResultadosMercadona();
+    });
+  return cargandoMercadona;
+}
+
+function renderPanelMercadona() {
+  const panel = document.getElementById("mercadona-panel");
+  if (!panel) return;
+  panel.hidden = tiendaOnline !== "mercadona";
+  if (panel.hidden) return;
+  const cp = leerLocal("fame-mercadona-cp");
+  const wh = leerLocal("fame-mercadona-wh");
+  let estado;
+  if (!wh) estado = "Pon tu código postal para ver los productos y precios de tu Mercadona.";
+  else if (cargandoMercadona) estado = "Descargando el catálogo de Mercadona…";
+  else if (errorMercadona) estado = `No se ha podido cargar el catálogo: ${escapeHTML(errorMercadona)}`;
+  else if (catalogoMercadona) {
+    const fecha = new Date(catalogoMercadona.fecha).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+    estado = `${catalogoMercadona.productos.length.toLocaleString("es-ES")} productos · precios del ${fecha}`;
+  } else estado = "";
+  panel.innerHTML = `
+    <form class="merc-cp">
+      <input type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="Código postal" value="${escapeHTML(cp)}" aria-label="Código postal" />
+      <button type="submit" class="btn-ghost btn-small">${wh ? "Cambiar" : "Usar"}</button>
+      ${wh ? `<button type="button" class="btn-ghost btn-small merc-actualizar" title="Volver a descargar precios">${icono("recargar")} Actualizar</button>` : ""}
+    </form>
+    <p class="hint">${estado}</p>`;
+  panel.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nuevo = panel.querySelector("input").value.trim();
+    if (!/^\d{5}$/.test(nuevo)) {
+      showToast("El código postal debe tener 5 cifras.", "error");
+      return;
+    }
+    try {
+      const almacen = await almacenDeCodigoPostal(RECETAS_PROXY_URL, nuevo);
+      guardarLocal("fame-mercadona-cp", nuevo);
+      guardarLocal("fame-mercadona-wh", almacen);
+      catalogoMercadona = null;
+      asegurarCatalogoMercadona();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  });
+  panel.querySelector(".merc-actualizar")?.addEventListener("click", () => asegurarCatalogoMercadona({ forzar: true }));
+}
+
+// El producto elegido para esa entrada: con los datos del catálogo actual si
+// está cargado (precio al día) o, si no, con los que se guardaron al elegirlo.
+function productoMercadona(entrada) {
+  const guardado = alimentosCache.find((a) => a.id === entrada.alimentoId)?.mercadona;
+  if (!guardado) return null;
+  return catalogoMercadona?.porId.get(guardado.id) || guardado;
+}
+
+function lineaMercadona(entrada, marcado) {
+  if (tiendaOnline !== "mercadona" || marcado || entrada.cubierto) return "";
+  const p = productoMercadona(entrada);
+  if (!p) {
+    return `<button type="button" class="merc-elegir" data-merc="${escapeHTML(entrada.clave)}">${icono("buscar")} Elegir producto</button>`;
+  }
+  const { envases, exacto } = envasesNecesarios(entrada.aComprar, p);
+  const foto = urlFoto(p, 96);
+  return `
+    <button type="button" class="merc-linea" data-merc="${escapeHTML(entrada.clave)}" title="Cambiar de producto">
+      ${foto ? `<img src="${foto}" alt="" loading="lazy" />` : ""}
+      <span class="merc-texto">
+        <span class="merc-nombre">${escapeHTML(p.n)}</span>
+        <span class="hint">${escapeHTML(formatoProducto(p))} · ${envases} × ${euros(p.p)}${exacto ? "" : " (revisa la cantidad)"}</span>
+      </span>
+    </button>`;
+}
+
+// Total del pedido: lo que falta por comprar y tiene producto elegido.
+function totalMercadona(entradas) {
+  let total = 0;
+  let conProducto = 0;
+  const pendientes = entradas.filter((e) => !e.cubierto);
+  for (const e of pendientes) {
+    const p = productoMercadona(e);
+    if (!p?.p) continue;
+    conProducto++;
+    total += envasesNecesarios(e.aComprar, p).envases * p.p;
+  }
+  return { total, conProducto, pendientes: pendientes.length };
+}
+
+let entradaMercadona = null;
+
+async function abrirSelectorMercadona(entrada) {
+  entradaMercadona = entrada;
+  document.getElementById("merc-modal-titulo").textContent = `Producto para «${entrada.nombre}»`;
+  const falta = textoFalta(entrada.aComprar);
+  document.getElementById("merc-falta").textContent = falta ? `Hace falta: ${falta}` : "";
+  document.getElementById("merc-buscar").value = entrada.nombre;
+  document.getElementById("merc-quitar").hidden = !productoMercadona(entrada);
+  document.getElementById("mercadona-modal").hidden = false;
+  pintarResultadosMercadona();
+  if (!catalogoMercadona) await asegurarCatalogoMercadona();
+}
+
+function cerrarSelectorMercadona() {
+  document.getElementById("mercadona-modal").hidden = true;
+  entradaMercadona = null;
+}
+
+function pintarResultadosMercadona() {
+  const cont = document.getElementById("merc-resultados");
+  const entrada = entradaMercadona;
+  if (!entrada) return;
+  if (!catalogoMercadona) {
+    cont.innerHTML = `<p class="hint">${cargandoMercadona ? "Descargando el catálogo de Mercadona…" : errorMercadona ? `No se ha podido cargar el catálogo: ${escapeHTML(errorMercadona)}` : "Pon tu código postal en la lista de la compra."}</p>`;
+    return;
+  }
+  const texto = document.getElementById("merc-buscar").value;
+  const lista = buscarProductos(catalogoMercadona.productos, texto, entrada.seccion, 12, entrada.aComprar);
+  const elegido = productoMercadona(entrada)?.id;
+  if (!lista.length) {
+    cont.innerHTML = `<p class="hint">No hay productos con ese nombre. Prueba con otra palabra.</p>`;
+    return;
+  }
+  cont.innerHTML = lista
+    .map((p) => {
+      const { envases, exacto } = envasesNecesarios(entrada.aComprar, p);
+      const foto = urlFoto(p, 96);
+      return `
+      <button type="button" class="merc-opcion ${p.id === elegido ? "elegido" : ""}" data-id="${escapeHTML(p.id)}">
+        ${foto ? `<img src="${foto}" alt="" loading="lazy" />` : `<span class="merc-sin-foto"></span>`}
+        <span class="merc-texto">
+          <span class="merc-nombre">${escapeHTML(p.n)}</span>
+          <span class="hint">${escapeHTML(formatoProducto(p))} · ${escapeHTML(precioReferencia(p))}</span>
+        </span>
+        <span class="merc-precio"><strong>${euros(p.p)}</strong><span class="hint">${exacto ? `× ${envases}` : ""}</span></span>
+      </button>`;
+    })
+    .join("");
+  cont.querySelectorAll(".merc-opcion").forEach((btn) => {
+    btn.addEventListener("click", () => elegirProductoMercadona(entrada, catalogoMercadona.porId.get(btn.dataset.id)));
+  });
+}
+
+// Se guarda en el alimento (en Firebase): así toda la familia ve la misma
+// elección y la próxima semana ya sale puesto.
+async function elegirProductoMercadona(entrada, producto) {
+  cerrarSelectorMercadona();
+  let alimento = entrada.alimentoId && alimentosCache.find((a) => a.id === entrada.alimentoId);
+  if (!alimento) alimento = await resolverAlimento(entrada.nombre);
+  if (!alimento) return;
+  const guardado = producto
+    ? (({ id, n, c, pk, s, u, ap, tu, p, r, rf, img, sl }) => ({ id, n, c, pk, s, u, ap, tu: tu ?? null, p, r, rf, img, sl }))(producto)
+    : null;
+  alimento.mercadona = guardado;
+  guardarAlimento({ id: alimento.id, mercadona: guardado });
+  renderListaCompra();
+}
+
+function enlaceTienda(entrada, marcado) {
+  const tienda = TIENDAS_ONLINE[tiendaOnline];
+  if (!tienda || marcado || entrada.cubierto) return "";
+  const producto = tiendaOnline === "mercadona" && productoMercadona(entrada);
+  if (producto) {
+    return `<a class="btn-tienda" href="${urlProducto(producto)}" target="_blank" rel="noopener" title="Abrir «${escapeHTML(producto.n)}» en Mercadona" aria-label="Abrir en Mercadona">${icono("carrito")}</a>`;
+  }
+  return `<a class="btn-tienda" href="${tienda.buscar(entrada.nombre)}" target="_blank" rel="noopener" title="Buscar «${escapeHTML(entrada.nombre)}» en ${tienda.nombre}" aria-label="Buscar en ${tienda.nombre}">${icono("carrito")}</a>`;
+}
+
 function renderListaCompra() {
   const cont = document.getElementById("lista-compra-contenido");
   if (!cont) return;
+  renderPanelMercadona();
+  if (tiendaOnline === "mercadona" && !catalogoMercadona && !cargandoMercadona && !errorMercadona) asegurarCatalogoMercadona();
   const entradas = agruparCompra(compraUsos, compraDoc.extras, inventarioCache, alimentosCache);
   for (const e of entradas) if (!SECCIONES.some((s) => s.id === e.seccion)) e.seccion = "otros";
 
@@ -1639,6 +1886,11 @@ function renderListaCompra() {
   let html = `
     <p class="compra-resumen"><span><strong>${listos}</strong> de ${entradas.length} listos</span><span>${entradas.length - listos} por comprar</span></p>
     <div class="compra-progreso"><span style="width:${porcentaje}%"></span></div>`;
+  if (tiendaOnline === "mercadona") {
+    const { total, conProducto, pendientes } = totalMercadona(entradas);
+    html += `<p class="merc-total"><span>Total estimado en Mercadona</span><strong>${euros(total)}</strong></p>
+      <p class="hint merc-total-nota">${conProducto} de ${pendientes} productos con producto elegido${conProducto < pendientes ? "; elige el resto para completar el total" : ""}.</p>`;
+  }
 
   for (const seccion of SECCIONES) {
     const items = entradas
@@ -1659,7 +1911,9 @@ function renderListaCompra() {
             <div class="compra-item-nota">${notaEntrada(e)}</div>
             ${e.platos.length ? `<div class="compra-item-platos">para: ${escapeHTML(e.platos.join(", "))}</div>` : ""}
             ${extras}
+            ${lineaMercadona(e, marcado)}
           </div>
+          ${enlaceTienda(e, marcado)}
           <select class="select-seccion" title="Mover a otra sección">${opcionesSeccion}</select>
         </li>`;
     }
@@ -1679,6 +1933,9 @@ function renderListaCompra() {
       // Breve pausa para que se vea el check antes de que baje al final.
       setTimeout(renderListaCompra, 350);
     });
+  });
+  cont.querySelectorAll("[data-merc]").forEach((btn) => {
+    btn.addEventListener("click", () => abrirSelectorMercadona(entradas.find((e) => e.clave === btn.dataset.merc)));
   });
   cont.querySelectorAll("[data-extra]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -2114,6 +2371,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initNavegadorSemanas();
   initDeslizarDias();
   initDeslizarPantallas();
+  initTiendaOnline();
   initFormPlato();
   initFormConfig();
   initGenerarMenu();
