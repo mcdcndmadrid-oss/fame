@@ -6,7 +6,7 @@ import { claveNombre, formatearCantidades } from "./compra.js";
 
 const CLAVE_CACHE = "fame-mercadona-v1";
 const VIGENCIA_MS = 7 * 24 * 3600 * 1000;
-const CATEGORIAS_POR_LLAMADA = 20;
+const CATEGORIAS_POR_LLAMADA = 8; // poco trabajo por llamada: el plan gratuito de Workers da 10 ms de CPU
 
 // Qué categorías de Mercadona encajan con cada sección de la lista de la compra.
 const CATEGORIAS_POR_SECCION = {
