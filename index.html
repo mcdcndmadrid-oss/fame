@@ -329,6 +329,15 @@
       <div class="menu-actions">
         <button id="btn-recalcular-compra" type="button" class="btn-primary"><svg class="ic"><use href="#i-recargar"/></svg> Recalcular desde el menú</button>
       </div>
+      <div class="compra-tienda">
+        <span class="hint">Buscar online en</span>
+        <div class="segmentado" role="group" aria-label="Supermercado online">
+          <button type="button" data-tienda="">Ninguno</button>
+          <button type="button" data-tienda="mercadona">Mercadona</button>
+          <button type="button" data-tienda="dia">DIA</button>
+        </div>
+      </div>
+      <div id="mercadona-panel" class="merc-panel" hidden></div>
       <p class="hint">Suma los ingredientes de los platos de la semana (un mismo alimento sale una sola vez aunque aparezca en varios platos o escrito distinto) y resta lo que ya tienes en el inventario. Agrupada por secciones del súper; si algo está en la sección equivocada, cámbialo con su desplegable y lo recordará.</p>
 
       <form id="form-extra-compra" class="ingrediente-row">
@@ -380,6 +389,19 @@
         <button id="foto-cancelar" class="btn-ghost">Cancelar</button>
         <button id="foto-reintentar" class="btn-ghost" hidden>Reintentar</button>
         <button id="foto-guardar" class="btn-primary" disabled>Añadir al inventario</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mercadona-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h3 class="modal-titulo" id="merc-modal-titulo">Elegir producto</h3>
+      <label class="buscador"><svg class="ic"><use href="#i-buscar"/></svg><input type="search" id="merc-buscar" placeholder="Buscar en Mercadona…" /></label>
+      <p id="merc-falta" class="hint"></p>
+      <div id="merc-resultados" class="merc-resultados"></div>
+      <div class="modal-actions">
+        <button id="merc-quitar" class="btn-ghost" hidden>Quitar producto</button>
+        <button id="merc-cancelar" class="btn-ghost">Cancelar</button>
       </div>
     </div>
   </div>

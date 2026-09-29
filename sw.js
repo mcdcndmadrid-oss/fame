@@ -3,7 +3,7 @@
 // sirve la última copia guardada. Los datos (Firestore) no pasan por aquí:
 // tienen su propia caché offline configurada en db.js.
 
-const CACHE = "fame-v12";
+const CACHE = "fame-v14";
 
 const APP = [
   "./",
@@ -19,6 +19,7 @@ const APP = [
   "js/compra.js",
   "js/recetas.js",
   "js/recetas-config.js",
+  "js/mercadona.js",
   "icons/icon-192.png",
   "icons/icon-512.png",
 ];

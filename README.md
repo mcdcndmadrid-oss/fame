@@ -74,7 +74,13 @@ El botón «Reconocer con foto» del Inventario usa el mismo Worker, que envía 
 
 1. En [Google AI Studio](https://aistudio.google.com/apikey) pulsa **Create API key** y cópiala. El nivel gratuito sobra para uso familiar.
 2. En Cloudflare, abre el Worker → **Settings → Variables and Secrets → Add**, tipo **Secret**, nombre `GEMINI_API_KEY`, valor la clave. Guarda.
-3. Opcional: una variable de texto `GEMINI_MODELO` si quieres otro modelo (por defecto `gemini-2.5-flash`).
+3. Opcional: una variable de texto `GEMINI_MODELO` si quieres otro modelo (por defecto `gemini-flash-latest`, y si está saturado prueba otros Flash).
+
+### Comprar en Mercadona
+
+En la lista de la compra, con «Buscar online en: Mercadona», el mismo Worker consulta el catálogo público de la tienda online de Mercadona (solo lectura, sin cuenta): código postal → almacén, y productos con formato y precio. La app guarda el catálogo en el móvil una semana, propone el producto de cada alimento y calcula envases y total. El producto elegido se guarda en el alimento (Firebase), así que vale para toda la familia. No hace falta configurar nada más que desplegar la versión actual del Worker.
+
+Se basa en la API interna de la web de Mercadona, que no está documentada: si un día cambia, habrá que ajustar el Worker.
 
 ## Estructura
 
