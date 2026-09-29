@@ -435,6 +435,72 @@ details[open] > summary::after { transform: rotate(-135deg); }
 
 .platos-seccion, .compra-seccion { margin-bottom: 1.4rem; }
 
+/* Compra online */
+.compra-tienda { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; margin: 0.2rem 0 0.8rem; }
+.btn-tienda {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  text-decoration: none;
+}
+.btn-tienda:hover { background: var(--accent); color: var(--accent-ink); }
+
+/* Mercadona: código postal, producto de cada alimento y total */
+.merc-panel { margin-bottom: 0.8rem; }
+.merc-panel .hint { margin: 0.35rem 0 0; }
+.merc-cp { flex-direction: row; gap: 0.4rem; align-items: center; flex-wrap: wrap; background: none; border: none; box-shadow: none; padding: 0; margin: 0; }
+.merc-cp input { width: 7.5rem; }
+.merc-total { display: flex; justify-content: space-between; align-items: baseline; margin: 0.9rem 0 0.1rem; font-size: 0.95rem; }
+.merc-total strong { font-size: 1.25rem; color: var(--accent); }
+.merc-total-nota { margin: 0 0 1rem; }
+.merc-elegir, .merc-linea {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+  padding: 0.3rem 0.6rem 0.3rem 0.3rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  background: none;
+  color: var(--accent);
+  font-size: 0.82rem;
+  text-align: left;
+  min-height: 0;
+  max-width: 100%;
+}
+.merc-elegir { padding-left: 0.6rem; }
+.merc-linea { border-style: solid; border-color: var(--border); background: var(--card-2); color: var(--ink); }
+.merc-linea img, .merc-opcion img, .merc-sin-foto { width: 2.4rem; height: 2.4rem; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #fff; }
+.merc-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.merc-nombre { font-weight: 500; overflow-wrap: anywhere; }
+#mercadona-modal .modal-card { max-width: 520px; max-height: 90vh; display: flex; flex-direction: column; }
+#mercadona-modal .buscador { margin: 0.4rem 0; }
+.merc-resultados { flex: 1 1 auto; min-height: 6rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+.merc-opcion {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  text-align: left;
+  min-height: 0;
+  height: auto;
+  flex-shrink: 0;
+  font-size: 0.88rem;
+}
+.merc-opcion:hover { border-color: var(--accent); }
+.merc-opcion.elegido { border-color: var(--accent); background: var(--accent-soft); }
+.merc-opcion .merc-texto { flex: 1; }
+.merc-precio { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+
 /* Selector de dos opciones (p. ej. agrupar el inventario) */
 .segmentado {
   display: inline-flex;
