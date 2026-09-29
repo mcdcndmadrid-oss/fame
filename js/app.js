@@ -1638,8 +1638,8 @@ function notaEntrada(e) {
 // Solo supermercados que venden alimentación online y aceptan la búsqueda en
 // la dirección (Lidl no vende comida online en España).
 const TIENDAS_ONLINE = {
-  mercadona: { nombre: "Mercadona", buscar: (q) => `https://tienda.mercadona.es/search-results?query=${encodeURIComponent(q)}` },
-  dia: { nombre: "DIA", buscar: (q) => `https://www.dia.es/search?q=${encodeURIComponent(q)}` },
+  mercadona: { nombre: "Mercadona", inicio: "https://tienda.mercadona.es/", buscar: (q) => `https://tienda.mercadona.es/search-results?query=${encodeURIComponent(q)}` },
+  dia: { nombre: "DIA", inicio: "https://www.dia.es/", buscar: (q) => `https://www.dia.es/search?q=${encodeURIComponent(q)}` },
 };
 
 let tiendaOnline = (() => {
@@ -1673,7 +1673,173 @@ const guardarLocal = (clave, valor) => {
   try { localStorage.setItem(clave, valor); } catch (e) {}
 };
 
+// ---------- modo compra: los pendientes de uno en uno ----------
+//
+// Abre cada producto en la tienda online; al volver a Fame se da por añadido
+// al carro, se marca y se pasa al siguiente (con opción de deshacer).
+
+let entradasCompra = [];
+let modoCompra = null; // { claves, i, abierto: clave abierta en la tienda, ultimo: clave recién marcada }
+
+// Orden de las categorías de la web de Mercadona (el del propio catálogo), para
+// recorrer la lista como sus pasillos; lo que no tiene producto va al final.
+function ordenModoCompra(pendientes) {
+  const ordenSeccion = (e) => SECCIONES.findIndex((s) => s.id === e.seccion);
+  if (tiendaOnline !== "mercadona" || !catalogoMercadona) {
+    return pendientes.sort((a, b) => ordenSeccion(a) - ordenSeccion(b) || a.nombre.localeCompare(b.nombre, "es"));
+  }
+  const ordenCategoria = new Map();
+  for (const p of catalogoMercadona.productos) if (!ordenCategoria.has(p.c)) ordenCategoria.set(p.c, ordenCategoria.size);
+  const clave = (e) => {
+    const p = productoMercadona(e);
+    return p ? ordenCategoria.get(p.c) ?? 900 : 1000 + ordenSeccion(e);
+  };
+  return pendientes.sort((a, b) => clave(a) - clave(b) || a.nombre.localeCompare(b.nombre, "es"));
+}
+
+function abrirModoCompra() {
+  const pendientes = entradasCompra.filter((e) => !e.cubierto && !compraDoc.marcados[e.clave]);
+  if (!pendientes.length) return;
+  modoCompra = { claves: ordenModoCompra(pendientes).map((e) => e.clave), i: 0, abierto: null, ultimo: null };
+  document.getElementById("modo-compra").hidden = false;
+  pintarModoCompra();
+}
+
+function cerrarModoCompra() {
+  modoCompra = null;
+  document.getElementById("modo-compra").hidden = true;
+}
+
+function marcarCompra(clave, valor) {
+  compraDoc.marcados[clave] = valor;
+  guardarListaCompra(compraSemanaId, compraDoc);
+  renderListaCompra();
+}
+
+// Siguiente pendiente a partir de la posición actual (se salta lo ya marcado).
+function avanzarModoCompra(desde) {
+  const { claves } = modoCompra;
+  let i = desde;
+  while (i < claves.length && compraDoc.marcados[claves[i]]) i++;
+  modoCompra.i = i;
+}
+
+function pintarModoCompra() {
+  const card = document.getElementById("modo-compra-card");
+  if (!modoCompra || !card) return;
+  const tienda = TIENDAS_ONLINE[tiendaOnline];
+  const { claves, i, ultimo } = modoCompra;
+  const hechos = claves.filter((c) => compraDoc.marcados[c]).length;
+  const porcentaje = Math.round((hechos / claves.length) * 100);
+  const nombreUltimo = ultimo && entradasCompra.find((e) => e.clave === ultimo)?.nombre;
+  const avisoUltimo = nombreUltimo
+    ? `<p class="mc-hecho">${icono("hoy")} «${escapeHTML(nombreUltimo)}» añadido <button type="button" class="btn-ghost btn-small" data-mc="deshacer">Deshacer</button></p>`
+    : "";
+  const cabecera = `
+    <div class="mc-cabecera">
+      <span class="hint">${hechos} de ${claves.length} en el carro</span>
+      <button type="button" class="btn-ghost btn-small" data-mc="salir">Salir</button>
+    </div>
+    <div class="compra-progreso"><span style="width:${porcentaje}%"></span></div>
+    ${avisoUltimo}`;
+
+  const entrada = i < claves.length && entradasCompra.find((e) => e.clave === claves[i]);
+  if (!entrada) {
+    const total = tiendaOnline === "mercadona" ? totalMercadona(entradasCompra.filter((e) => claves.includes(e.clave))).total : 0;
+    card.innerHTML = `${cabecera}
+      <div class="mc-fin">
+        <span class="empty-icono">${icono("carrito")}</span>
+        <h3>Lista completa</h3>
+        <p class="hint">${hechos === claves.length ? "Todo está en el carro." : `Te has saltado ${claves.length - hechos}; siguen pendientes en la lista.`}${total ? ` Total estimado: <strong>${euros(total)}</strong>.` : ""}</p>
+        <a class="btn-primary mc-abrir" href="${tienda.inicio}" target="_blank" rel="noopener">Ir a ${tienda.nombre} a pagar</a>
+        <button type="button" class="btn-ghost" data-mc="salir">Volver a la lista</button>
+      </div>`;
+  } else {
+    const p = tiendaOnline === "mercadona" ? productoMercadona(entrada) : null;
+    const falta = textoFalta(entrada.aComprar);
+    let producto = "";
+    if (p) {
+      const { envases, exacto } = envasesNecesarios(entrada.aComprar, p);
+      const foto = urlFoto(p, 240);
+      producto = `
+        <button type="button" class="mc-producto" data-mc="cambiar" title="Cambiar de producto">
+          ${foto ? `<img src="${foto}" alt="" />` : ""}
+          <span class="merc-texto">
+            <span class="merc-nombre">${escapeHTML(p.n)}</span>
+            <span class="hint">${escapeHTML(formatoProducto(p))}</span>
+            <span class="mc-cantidad">Añade <strong>${envases}</strong> · ${euros(envases * p.p)}${exacto ? "" : " (revisa la cantidad)"}</span>
+          </span>
+        </button>`;
+    } else if (tiendaOnline === "mercadona") {
+      producto = `<button type="button" class="merc-elegir mc-elegir" data-mc="cambiar">${icono("buscar")} Elegir producto (si no, se abre la búsqueda)</button>`;
+    }
+    const url = p ? urlProducto(p) : tienda.buscar(entrada.nombre);
+    card.innerHTML = `${cabecera}
+      <div class="mc-paso">
+        <span class="hint">${i + 1} de ${claves.length}</span>
+        <h3 class="mc-nombre">${escapeHTML(entrada.nombre)}</h3>
+        <p class="hint">${[falta && `Hace falta: ${escapeHTML(falta)}`, entrada.platos.length && `para: ${escapeHTML(entrada.platos.join(", "))}`].filter(Boolean).join(" · ")}</p>
+        ${producto}
+        <a class="btn-primary mc-abrir" data-mc="abrir" href="${url}" target="_blank" rel="noopener">${icono("carrito")} ${p ? "Abrir" : "Buscar"} en ${tienda.nombre}</a>
+        <p class="hint mc-ayuda">Añádelo al carro allí y vuelve a Fame: lo marcaré y pasaré al siguiente.</p>
+        <div class="mc-acciones">
+          <button type="button" class="btn-ghost" data-mc="anterior" ${i === 0 ? "disabled" : ""}>${icono("izq")} Anterior</button>
+          <button type="button" class="btn-ghost" data-mc="saltar">Saltar</button>
+          <button type="button" class="btn-ghost" data-mc="hecho">Ya está ${icono("der")}</button>
+        </div>
+      </div>`;
+  }
+
+  card.querySelectorAll("[data-mc]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const accion = el.dataset.mc;
+      const actual = modoCompra.claves[modoCompra.i];
+      if (accion === "salir") return cerrarModoCompra();
+      if (accion === "abrir") {
+        modoCompra.abierto = actual;
+        return; // el enlace abre la tienda; al volver se marca (ver initModoCompra)
+      }
+      if (accion === "cambiar") return abrirSelectorMercadona(entradasCompra.find((e) => e.clave === actual));
+      if (accion === "deshacer") {
+        const clave = modoCompra.ultimo;
+        modoCompra.ultimo = null;
+        modoCompra.i = modoCompra.claves.indexOf(clave);
+        return marcarCompra(clave, false);
+      }
+      if (accion === "anterior") {
+        modoCompra.ultimo = null;
+        modoCompra.i = Math.max(0, modoCompra.i - 1);
+        return pintarModoCompra();
+      }
+      if (accion === "saltar") {
+        modoCompra.ultimo = null;
+        modoCompra.i++;
+        return pintarModoCompra();
+      }
+      if (accion === "hecho") {
+        modoCompra.ultimo = actual;
+        avanzarModoCompra(modoCompra.i + 1);
+        return marcarCompra(actual, true);
+      }
+    });
+  });
+}
+
+// Al volver de la tienda (la app vuelve a estar visible) se da por añadido.
+function initModoCompra() {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !modoCompra?.abierto) return;
+    const clave = modoCompra.abierto;
+    modoCompra.abierto = null;
+    if (modoCompra.claves[modoCompra.i] !== clave) return;
+    modoCompra.ultimo = clave;
+    avanzarModoCompra(modoCompra.i + 1);
+    marcarCompra(clave, true);
+  });
+}
+
 function initMercadona() {
+  initModoCompra();
   document.getElementById("merc-cancelar").addEventListener("click", cerrarSelectorMercadona);
   document.getElementById("merc-buscar").addEventListener("input", pintarResultadosMercadona);
   document.getElementById("merc-quitar").addEventListener("click", () => {
@@ -1873,6 +2039,8 @@ function renderListaCompra() {
   if (tiendaOnline === "mercadona" && !catalogoMercadona && !cargandoMercadona && !errorMercadona) asegurarCatalogoMercadona();
   const entradas = agruparCompra(compraUsos, compraDoc.extras, inventarioCache, alimentosCache);
   for (const e of entradas) if (!SECCIONES.some((s) => s.id === e.seccion)) e.seccion = "otros";
+  entradasCompra = entradas;
+  if (modoCompra) pintarModoCompra();
 
   if (entradas.length === 0) {
     cont.innerHTML = `<div class="empty-state"><span class="empty-icono">${icono("carrito")}</span><p>No hay nada que comprar: no hay menú esta semana o sus platos no tienen ingredientes.</p></div>`;
@@ -1890,6 +2058,10 @@ function renderListaCompra() {
     const { total, conProducto, pendientes } = totalMercadona(entradas);
     html += `<p class="merc-total"><span>Total estimado en Mercadona</span><strong>${euros(total)}</strong></p>
       <p class="hint merc-total-nota">${conProducto} de ${pendientes} productos con producto elegido${conProducto < pendientes ? "; elige el resto para completar el total" : ""}.</p>`;
+  }
+  const porComprar = entradas.length - listos;
+  if (TIENDAS_ONLINE[tiendaOnline] && porComprar > 0) {
+    html += `<button type="button" id="btn-modo-compra" class="btn-primary mc-empezar">${icono("carrito")} Modo compra en ${TIENDAS_ONLINE[tiendaOnline].nombre} (${porComprar})</button>`;
   }
 
   for (const seccion of SECCIONES) {
@@ -1934,6 +2106,7 @@ function renderListaCompra() {
       setTimeout(renderListaCompra, 350);
     });
   });
+  document.getElementById("btn-modo-compra")?.addEventListener("click", abrirModoCompra);
   cont.querySelectorAll("[data-merc]").forEach((btn) => {
     btn.addEventListener("click", () => abrirSelectorMercadona(entradas.find((e) => e.clave === btn.dataset.merc)));
   });
