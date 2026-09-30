@@ -2303,17 +2303,40 @@ function cerrarFotoModal() {
   document.getElementById("foto-resultados").innerHTML = "";
 }
 
-// Reduce la foto a 1024 px de lado mayor en JPEG: basta para reconocer y
-// viaja mucho más rápido que la original del móvil.
-async function fotoEnBase64(archivo, lado = 1024) {
-  const bitmap = await createImageBitmap(archivo);
-  const escala = Math.min(1, lado / Math.max(bitmap.width, bitmap.height));
+// Reduce la foto a 800 px de lado mayor en JPEG: basta para reconocer y
+// viaja mucho más rápido que la original del móvil (menos espera y menos
+// fallos con mala cobertura).
+async function fotoEnBase64(archivo, lado = 800) {
+  let imagen;
+  try {
+    imagen = await createImageBitmap(archivo);
+  } catch (e) {
+    // Formatos que createImageBitmap no abre en algunos móviles: se prueba con <img>.
+    imagen = await new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(archivo);
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("no se puede abrir la foto; prueba a sacarla otra vez"));
+      img.src = url;
+    });
+  }
+  const ancho = imagen.width || imagen.naturalWidth;
+  const alto = imagen.height || imagen.naturalHeight;
+  const escala = Math.min(1, lado / Math.max(ancho, alto));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * escala);
-  canvas.height = Math.round(bitmap.height * escala);
-  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close?.();
-  return canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
+  canvas.width = Math.round(ancho * escala);
+  canvas.height = Math.round(alto * escala);
+  canvas.getContext("2d").drawImage(imagen, 0, 0, canvas.width, canvas.height);
+  imagen.close?.();
+  if (imagen.src) URL.revokeObjectURL(imagen.src);
+  return canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+}
+
+// Mensaje entendible para los fallos de red o de tiempo.
+function motivoFalloFoto(e) {
+  if (e.name === "AbortError" || e.name === "TimeoutError") return "ha tardado demasiado. Inténtalo de nuevo en un momento.";
+  if (e instanceof TypeError) return "no hay conexión con el servidor. Comprueba la conexión a internet.";
+  return e.message;
 }
 
 async function reconocerFoto(archivo) {
@@ -2326,8 +2349,15 @@ async function reconocerFoto(archivo) {
   guardar.disabled = true;
   reintentar.hidden = true;
   document.getElementById("foto-ubicacion-fila").hidden = true;
-  estado.textContent = "Reconociendo alimentos…";
   document.getElementById("foto-modal").hidden = false;
+  // Contador de segundos: con Gemini saturado la espera puede alargarse.
+  const inicio = Date.now();
+  const pintarEspera = () => {
+    const s = Math.round((Date.now() - inicio) / 1000);
+    estado.textContent = s < 3 ? "Reconociendo alimentos…" : `Reconociendo alimentos… ${s} s`;
+  };
+  pintarEspera();
+  const reloj = setInterval(pintarEspera, 1000);
 
   let alimentos;
   try {
@@ -2336,18 +2366,24 @@ async function reconocerFoto(archivo) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imagen, conocidos: alimentosCache.map((a) => a.nombre) }),
+      signal: AbortSignal.timeout(60_000),
     });
     const datos = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(datos.error || `error ${res.status}`);
     alimentos = datos.alimentos || [];
   } catch (e) {
-    estado.textContent = `No se ha podido reconocer la foto: ${e.message}`;
+    estado.textContent = `No se ha podido reconocer la foto: ${motivoFalloFoto(e)}`;
     reintentar.hidden = false;
     return;
+  } finally {
+    clearInterval(reloj);
   }
+  // Se ha cancelado mientras esperaba (Cancelar cierra la ventana).
+  if (ultimaFotoAlimentos !== archivo) return;
 
   if (!alimentos.length) {
-    estado.textContent = "No he encontrado alimentos en la foto. Prueba con más luz o más cerca.";
+    estado.textContent = "No he encontrado alimentos en la foto. Prueba con más luz, más cerca y con los alimentos separados.";
+    reintentar.hidden = false;
     return;
   }
   estado.textContent = "Revisa lo reconocido: corrige lo que haga falta y desmarca lo que no quieras añadir.";
