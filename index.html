@@ -86,7 +86,7 @@
       <svg class="ic tab-icon"><use href="#i-ajustes"/></svg><span class="tab-label">Reglas</span>
     </button>
     <button class="tab-btn" data-tab="inventario">
-      <svg class="ic tab-icon"><use href="#i-nevera"/></svg><span class="tab-label">Inventario</span>
+      <svg class="ic tab-icon"><use href="#i-nevera"/></svg><span class="tab-label">Despensa</span>
     </button>
     <button class="tab-btn" data-tab="compra">
       <svg class="ic tab-icon"><use href="#i-carrito"/></svg><span class="tab-label">Compra</span>
@@ -138,6 +138,11 @@
 
     <section id="tab-platos" class="tab-panel" hidden>
       <h2>Recetas</h2>
+      <div id="panel-plato" class="panel-nuevo" hidden>
+        <div class="panel-nuevo-cabecera">
+          <h3 id="panel-plato-titulo">Nueva receta</h3>
+          <button type="button" class="btn-ghost btn-icono" data-cerrar-panel="panel-plato" title="Cerrar" aria-label="Cerrar"><svg class="ic"><use href="#i-cerrar"/></svg></button>
+        </div>
       <details id="importar-receta" class="importar-receta">
         <summary><svg class="ic"><use href="#i-enlace"/></svg> Importar receta de una web o pegando el texto</summary>
         <div class="importar-fila">
@@ -196,16 +201,18 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn-primary">Guardar plato</button>
+          <button type="submit" class="btn-primary">Guardar receta</button>
           <button type="button" id="btn-cancelar-edicion" class="btn-ghost" hidden>Cancelar edición</button>
         </div>
       </form>
+      </div>
 
       <div class="platos-toolbar">
-        <label class="buscador"><svg class="ic"><use href="#i-buscar"/></svg><input type="search" id="filtro-platos" placeholder="Buscar plato…" /></label>
+        <label class="buscador"><svg class="ic"><use href="#i-buscar"/></svg><input type="search" id="filtro-platos" placeholder="Buscar receta…" /></label>
       </div>
       <div id="filtro-categoria-chips" class="filtro-chips"></div>
       <div id="lista-platos"></div>
+      <button type="button" class="fab" data-panel="panel-plato" title="Nueva receta" aria-label="Nueva receta"><svg class="ic"><use href="#i-mas"/></svg></button>
     </section>
 
     <section id="tab-config" class="tab-panel" hidden>
@@ -279,7 +286,12 @@
     </section>
 
     <section id="tab-inventario" class="tab-panel" hidden>
-      <h2>Inventario</h2>
+      <h2>Despensa</h2>
+      <div id="panel-inventario" class="panel-nuevo" hidden>
+        <div class="panel-nuevo-cabecera">
+          <h3 id="panel-inventario-titulo">Añadir a la despensa</h3>
+          <button type="button" class="btn-ghost btn-icono" data-cerrar-panel="panel-inventario" title="Cerrar" aria-label="Cerrar"><svg class="ic"><use href="#i-cerrar"/></svg></button>
+        </div>
       <form id="form-inventario">
         <input type="hidden" id="inv-id" />
         <input type="hidden" id="inv-codigo" />
@@ -304,15 +316,17 @@
           <button type="button" id="btn-cancelar-inventario" class="btn-ghost" hidden>Cancelar edición</button>
         </div>
       </form>
+      </div>
 
       <div class="platos-toolbar">
-        <label class="buscador"><svg class="ic"><use href="#i-buscar"/></svg><input type="search" id="filtro-inventario" placeholder="Buscar en el inventario…" /></label>
+        <label class="buscador"><svg class="ic"><use href="#i-buscar"/></svg><input type="search" id="filtro-inventario" placeholder="Buscar en la despensa…" /></label>
         <div class="segmentado" role="group" aria-label="Agrupar inventario">
           <button type="button" data-agrupar="ubicacion" class="active">Por ubicación</button>
           <button type="button" data-agrupar="categoria">Por categoría</button>
         </div>
       </div>
       <div id="lista-inventario"></div>
+      <button type="button" class="fab" data-panel="panel-inventario" title="Añadir a la despensa" aria-label="Añadir a la despensa"><svg class="ic"><use href="#i-mas"/></svg></button>
     </section>
 
     <section id="tab-compra" class="tab-panel" hidden>
@@ -338,7 +352,7 @@
         </div>
       </div>
       <div id="mercadona-panel" class="merc-panel" hidden></div>
-      <p class="hint">Suma los ingredientes de los platos de la semana (un mismo alimento sale una sola vez aunque aparezca en varios platos o escrito distinto) y resta lo que ya tienes en el inventario. Agrupada por secciones del súper; si algo está en la sección equivocada, cámbialo con su desplegable y lo recordará.</p>
+      <p class="hint">Suma los ingredientes de los platos de la semana (un mismo alimento sale una sola vez aunque aparezca en varios platos o escrito distinto) y resta lo que ya tienes en la despensa. Agrupada por secciones del súper; si algo está en la sección equivocada, cámbialo con su desplegable y lo recordará.</p>
 
       <form id="form-extra-compra" class="ingrediente-row">
         <input type="text" id="extra-nombre" placeholder="Añadir algo que no sea del menú…" list="alimentos-conocidos" />
@@ -388,7 +402,7 @@
       <div class="modal-actions">
         <button id="foto-cancelar" class="btn-ghost">Cancelar</button>
         <button id="foto-reintentar" class="btn-ghost" hidden>Reintentar</button>
-        <button id="foto-guardar" class="btn-primary" disabled>Añadir al inventario</button>
+        <button id="foto-guardar" class="btn-primary" disabled>Añadir a la despensa</button>
       </div>
     </div>
   </div>
