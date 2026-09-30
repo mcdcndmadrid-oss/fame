@@ -761,11 +761,12 @@ function renderPlatosList() {
 
     for (const plato of items) {
       const li = document.createElement("li");
+      const sinReceta = !(plato.ingredientes || []).length && !(plato.pasos || []).length;
       li.innerHTML = `
-        <div>
-          <strong>${plato.nombre}</strong>
-          <div class="plato-meta hint">${CURSO_NOMBRE[cursoDePlato(plato)]} · ${plato.tiempoPrep || "normal"}</div>
-        </div>
+        <button type="button" class="plato-abrir" title="Ver receta">
+          <strong>${escapeHTML(plato.nombre)}</strong>
+          <span class="plato-meta hint">${CURSO_NOMBRE[cursoDePlato(plato)]} · ${TIEMPO_LABEL[plato.tiempoPrep] || TIEMPO_LABEL.normal}${sinReceta ? " · sin receta" : ""}</span>
+        </button>
         <div class="plato-actions">
           <button data-action="favorito" class="${plato.favorito ? "fav-activo" : ""}" title="${plato.favorito ? "Quitar de favoritos" : "Marcar como favorito"}">${icono("estrella")}</button>
           <button data-action="editar" title="Editar">${icono("lapiz")}</button>
@@ -777,6 +778,7 @@ function renderPlatosList() {
         platosCache = await listarPlatos();
         renderPlatosList();
       });
+      li.querySelector(".plato-abrir").addEventListener("click", () => abrirReceta(plato));
       li.querySelector('[data-action="editar"]').addEventListener("click", () => cargarPlatoEnForm(plato));
       li.querySelector('[data-action="borrar"]').addEventListener("click", async () => {
         const ok = await confirmDialog(`¿Borrar "${plato.nombre}"?`);
@@ -790,6 +792,49 @@ function renderPlatosList() {
     }
     contenedor.appendChild(seccion);
   }
+}
+
+// ---------- receta de un plato (al pulsarlo en la lista) ----------
+
+const TIEMPO_LABEL = { rapido: "Rápido", normal: "Tiempo normal", largo: "Largo" };
+let platoEnReceta = null;
+
+function abrirReceta(plato) {
+  platoEnReceta = plato;
+  const ingredientes = (plato.ingredientes || []).map((i) => `<li>${escapeHTML(formatearIngrediente(i))}</li>`).join("");
+  const pasos = (plato.pasos || []).map((p) => `<li>${escapeHTML(p)}</li>`).join("");
+  const meta = [categoriaTexto(plato.categoria), CURSO_NOMBRE[cursoDePlato(plato)], TIEMPO_LABEL[plato.tiempoPrep] || TIEMPO_LABEL.normal];
+  document.getElementById("receta-modal-contenido").innerHTML = `
+    <p class="hint receta-modal-meta">${meta.filter(Boolean).join(" · ")}${plato.favorito ? ` · <span class="fav-activo">${icono("estrella")}</span> Favorito` : ""}</p>
+    <h3 id="receta-modal-titulo" class="receta-modal-titulo">${escapeHTML(plato.nombre)}</h3>
+    ${ingredientes ? `<h4>Ingredientes</h4><ul class="ingredientes-chips">${ingredientes}</ul>` : ""}
+    ${pasos ? `<h4>Preparación</h4><ol class="receta-pasos">${pasos}</ol>` : ""}
+    ${!ingredientes && !pasos ? `<p class="hint">Este plato aún no tiene receta. Pulsa «Editar» para añadir los ingredientes y los pasos.</p>` : ""}
+    ${plato.fuente ? `<p><a href="${escapeHTML(plato.fuente)}" target="_blank" rel="noopener">Ver receta original ↗</a></p>` : ""}`;
+  document.getElementById("receta-modal").hidden = false;
+  document.getElementById("receta-modal-cerrar").focus();
+}
+
+function cerrarReceta() {
+  document.getElementById("receta-modal").hidden = true;
+  platoEnReceta = null;
+}
+
+function initReceta() {
+  const modal = document.getElementById("receta-modal");
+  document.getElementById("receta-modal-cerrar").addEventListener("click", cerrarReceta);
+  document.getElementById("receta-modal-editar").addEventListener("click", () => {
+    const plato = platoEnReceta;
+    cerrarReceta();
+    if (plato) cargarPlatoEnForm(plato);
+  });
+  // Tocar fuera de la tarjeta o pulsar Escape también cierra.
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) cerrarReceta();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modal.hidden) cerrarReceta();
+  });
 }
 
 function cargarPlatoEnForm(plato) {
@@ -2544,6 +2589,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initNavegadorSemanas();
   initDeslizarDias();
   initDeslizarPantallas();
+  initReceta();
   initTiendaOnline();
   initFormPlato();
   initFormConfig();
