@@ -685,14 +685,14 @@ function initFormPlato() {
       pasos: leerPasos(),
     };
     await guardarPlato(plato);
-    resetFormPlato();
+    cerrarPanel("panel-plato");
     platosCache = await listarPlatos();
     renderPlatosList();
     buildAlimentosConocidos();
     showToast(`"${plato.nombre}" guardado.`, "success");
   });
 
-  btnCancelar.addEventListener("click", resetFormPlato);
+  btnCancelar.addEventListener("click", () => cerrarPanel("panel-plato"));
 
   // Al elegir categoría se propone el curso habitual; se puede cambiar a mano.
   const curso = document.getElementById("plato-curso");
@@ -744,7 +744,7 @@ function renderPlatosList() {
   });
 
   if (filtrados.length === 0) {
-    contenedor.innerHTML = `<div class="empty-state"><span class="empty-icono">${icono("buscar")}</span><p>No hay platos que coincidan.</p></div>`;
+    contenedor.innerHTML = `<div class="empty-state"><span class="empty-icono">${icono("buscar")}</span><p>${platosCache.length === 0 ? "Aún no hay recetas. Pulsa + para añadir la primera." : "No hay recetas que coincidan."}</p></div>`;
     return;
   }
 
@@ -850,7 +850,7 @@ function cargarPlatoEnForm(plato) {
   resetPasos(plato.pasos || []);
   document.getElementById("btn-cancelar-edicion").hidden = false;
   document.querySelector('[data-tab="platos"]').click();
-  document.getElementById("plato-nombre").scrollIntoView({ behavior: "smooth" });
+  abrirPanel("panel-plato", true);
 }
 
 // ---------- pestaña "Restricciones": tabla de días ----------
@@ -1415,7 +1415,44 @@ function initImprimir() {
   document.getElementById("btn-imprimir").addEventListener("click", () => window.print());
 }
 
-// ---------- pestaña "Inventario" ----------
+// ---------- formularios desplegables (botón + de Recetas y Despensa) ----------
+
+const PANELES = {
+  "panel-plato": { titulos: ["Nueva receta", "Editar receta"], limpiar: () => resetFormPlato(), foco: "plato-nombre" },
+  "panel-inventario": { titulos: ["Añadir a la despensa", "Editar producto"], limpiar: () => resetFormInventario(), foco: "inv-nombre" },
+};
+
+function abrirPanel(id, editando = false) {
+  const panel = document.getElementById(id);
+  panel.hidden = false;
+  document.getElementById(`${id}-titulo`).textContent = PANELES[id].titulos[editando ? 1 : 0];
+  document.querySelector(`.fab[data-panel="${id}"]`)?.classList.add("abierto");
+  // Arriba del todo, justo debajo de la cabecera fija.
+  const cabecera = document.querySelector(".app-header")?.offsetHeight || 0;
+  window.scrollTo({ top: panel.getBoundingClientRect().top + window.scrollY - cabecera - 12, behavior: "smooth" });
+  if (!editando) document.getElementById(PANELES[id].foco)?.focus({ preventScroll: true });
+}
+
+function cerrarPanel(id) {
+  document.getElementById(id).hidden = true;
+  document.querySelector(`.fab[data-panel="${id}"]`)?.classList.remove("abierto");
+  PANELES[id].limpiar();
+}
+
+function initPaneles() {
+  document.querySelectorAll(".fab[data-panel]").forEach((fab) => {
+    fab.addEventListener("click", () => {
+      const id = fab.dataset.panel;
+      if (document.getElementById(id).hidden) abrirPanel(id);
+      else cerrarPanel(id);
+    });
+  });
+  document.querySelectorAll("[data-cerrar-panel]").forEach((btn) => {
+    btn.addEventListener("click", () => cerrarPanel(btn.dataset.cerrarPanel));
+  });
+}
+
+// ---------- pestaña "Despensa" (antes Inventario) ----------
 
 function initFormInventario() {
   const form = document.getElementById("form-inventario");
@@ -1437,14 +1474,14 @@ function initFormInventario() {
       actualizado: toISO(new Date()),
     };
     await guardarItemInventario(item);
-    resetFormInventario();
+    cerrarPanel("panel-inventario");
     inventarioCache = await listarInventario();
     renderInventarioList();
     buildAlimentosConocidos();
-    showToast(`"${item.nombre}" guardado en el inventario.`, "success");
+    showToast(`"${item.nombre}" guardado en la despensa.`, "success");
   });
 
-  document.getElementById("btn-cancelar-inventario").addEventListener("click", resetFormInventario);
+  document.getElementById("btn-cancelar-inventario").addEventListener("click", () => cerrarPanel("panel-inventario"));
   document.getElementById("filtro-inventario").addEventListener("input", renderInventarioList);
 
   document.querySelectorAll("[data-agrupar]").forEach((btn) => {
@@ -1473,7 +1510,7 @@ function cargarItemEnForm(item) {
   document.getElementById("inv-codigo").value = item.codigoBarras || "";
   document.getElementById("btn-cancelar-inventario").hidden = false;
   document.querySelector('[data-tab="inventario"]').click();
-  document.getElementById("inv-nombre").scrollIntoView({ behavior: "smooth" });
+  abrirPanel("panel-inventario", true);
 }
 
 function categoriaInventario(item) {
@@ -1537,7 +1574,7 @@ function itemInventarioLi(item, mostrarUbicacion) {
   li.querySelector('[data-action="mas"]').addEventListener("click", () => cambiarCantidadInventario(item, 1, span));
   li.querySelector('[data-action="editar"]').addEventListener("click", () => cargarItemEnForm(item));
   li.querySelector('[data-action="borrar"]').addEventListener("click", async () => {
-    const ok = await confirmDialog(`¿Borrar "${item.nombre}" del inventario?`);
+    const ok = await confirmDialog(`¿Borrar "${item.nombre}" de la despensa?`);
     if (!ok) return;
     // Un guardado pendiente de − / + no debe llegar después del borrado.
     clearTimeout(guardadosPendientesInventario.get(item.id));
@@ -1582,7 +1619,7 @@ function renderInventarioList() {
   const filtrados = inventarioCache.filter((i) => !texto || i.nombre.toLowerCase().includes(texto));
 
   if (filtrados.length === 0) {
-    contenedor.innerHTML = `<div class="empty-state"><span class="empty-icono">${icono("nevera")}</span><p>${inventarioCache.length === 0 ? "El inventario está vacío." : "No hay productos que coincidan."}</p></div>`;
+    contenedor.innerHTML = `<div class="empty-state"><span class="empty-icono">${icono("nevera")}</span><p>${inventarioCache.length === 0 ? "La despensa está vacía. Pulsa + para añadir lo que tienes en casa." : "No hay productos que coincidan."}</p></div>`;
     return;
   }
 
@@ -2446,7 +2483,10 @@ async function guardarAlimentosDeFoto() {
   inventarioCache = await listarInventario();
   renderInventarioList();
   buildAlimentosConocidos();
-  if (nombres.length) showToast(`Añadido al inventario: ${nombres.join(", ")}.`, "success");
+  if (nombres.length) {
+    cerrarPanel("panel-inventario");
+    showToast(`Añadido a la despensa: ${nombres.join(", ")}.`, "success");
+  }
 }
 
 function initBarcodeScanner() {
@@ -2572,8 +2612,8 @@ function rellenarFormularioConReceta(plato) {
   resetPasos(plato.pasos);
   document.getElementById("btn-cancelar-edicion").hidden = false;
   document.getElementById("importar-receta").open = false;
-  document.getElementById("plato-nombre").scrollIntoView({ behavior: "smooth", block: "center" });
-  showToast(`Receta cargada: ${plato.ingredientes.length} ingredientes y ${plato.pasos.length} pasos. Revísala y pulsa «Guardar plato».`, "success");
+  abrirPanel("panel-plato");
+  showToast(`Receta cargada: ${plato.ingredientes.length} ingredientes y ${plato.pasos.length} pasos. Revísala y pulsa «Guardar receta».`, "success");
 }
 
 // Al compartir una página con Fame desde el móvil (Compartir → Fame), la app
@@ -2625,6 +2665,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initNavegadorSemanas();
   initDeslizarDias();
   initDeslizarPantallas();
+  initPaneles();
   initReceta();
   initTiendaOnline();
   initFormPlato();
