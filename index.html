@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fame — Menú Familiar</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#3f6f4a" />
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeos.
+    try { const tema = localStorage.getItem("fame-tema"); if (tema) document.documentElement.dataset.theme = tema; } catch (e) {}
+  </script>
+  <link rel="apple-touch-icon" href="icons/fame-apple-180.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Fame" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-hoy" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-calendario" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="i-libro" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+    <symbol id="i-ajustes" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+    <symbol id="i-nevera" viewBox="0 0 24 24"><path d="M5 6a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M5 10h14M15 7v6"/></symbol>
+    <symbol id="i-carrito" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+    <symbol id="i-cubiertos" viewBox="0 0 24 24"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></symbol>
+    <symbol id="i-destellos" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8zM5 2l.6 1.4L7 4l-1.4.6L5 6l-.6-1.4L3 4l1.4-.6z"/></symbol>
+    <symbol id="i-imprimir" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></symbol>
+    <symbol id="i-izq" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-der" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-intercambiar" viewBox="0 0 24 24"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></symbol>
+    <symbol id="i-camara" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-escanear" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M8 7v10M12 7v10M17 7v10"/></symbol>
+    <symbol id="i-archivo" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15l3-3 3 3"/></symbol>
+    <symbol id="i-enlace" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+    <symbol id="i-recargar" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></symbol>
+    <symbol id="i-mas" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-cerrar" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-descargar" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-salir" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-cole" viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></symbol>
+    <symbol id="i-luna" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></symbol>
+    <symbol id="i-buscar" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-lapiz" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></symbol>
+    <symbol id="i-papelera" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-estrella" viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+    <symbol id="i-hola" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
+    <symbol id="i-cesta" viewBox="0 0 24 24"><path d="m15 11-1 9M19 11l-4-7M2 11h20M3.5 11l1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4M4.5 15.5h15M5 11l4-7M9 11l1 9"/></symbol>
+  </svg>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-marca"><svg class="ic"><use href="#i-cubiertos"/></svg></span>
+      <div>
+        <h1>Fame</h1>
+        <p class="brand-tagline">Menú y compra familiar</p>
+      </div>
+    </div>
+    <div id="auth-box">
+      <button id="btn-tema" class="btn-ghost btn-icono btn-tema" type="button" title="Cambiar a modo oscuro" aria-label="Cambiar tema"><svg class="ic ic-luna"><use href="#i-luna"/></svg><svg class="ic ic-sol"><use href="#i-hoy"/></svg></button>
+      <button id="btn-instalar" class="btn-ghost btn-small" hidden><svg class="ic"><use href="#i-descargar"/></svg> Instalar</button>
+      <button id="btn-login" class="btn-primary" hidden>Entrar con Google</button>
+      <span id="user-info" class="user-chip" hidden></span>
+      <button id="btn-logout" class="btn-ghost btn-icono" title="Salir" hidden><svg class="ic"><use href="#i-salir"/></svg></button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="hoy">
+      <svg class="ic tab-icon"><use href="#i-hoy"/></svg><span class="tab-label">Hoy</span>
+    </button>
+    <button class="tab-btn" data-tab="menu">
+      <svg class="ic tab-icon"><use href="#i-calendario"/></svg><span class="tab-label">Menú</span>
+    </button>
+    <button class="tab-btn" data-tab="platos">
+      <svg class="ic tab-icon"><use href="#i-libro"/></svg><span class="tab-label">Recetas</span>
+    </button>
+    <button class="tab-btn" data-tab="config">
+      <svg class="ic tab-icon"><use href="#i-ajustes"/></svg><span class="tab-label">Reglas</span>
+    </button>
+    <button class="tab-btn" data-tab="inventario">
+      <svg class="ic tab-icon"><use href="#i-nevera"/></svg><span class="tab-label">Despensa</span>
+    </button>
+    <button class="tab-btn" data-tab="compra">
+      <svg class="ic tab-icon"><use href="#i-carrito"/></svg><span class="tab-label">Compra</span>
+    </button>
+  </nav>
+
+  <main id="app-main">
+    <div id="signed-out-msg" class="empty-state" hidden>
+      <span class="empty-icono"><svg class="ic"><use href="#i-hola"/></svg></span>
+      <p>Inicia sesión con Google para ver y editar el menú familiar.</p>
+    </div>
+
+    <section id="tab-hoy" class="tab-panel">
+      <div id="hoy-content" class="loading">Cargando…</div>
+    </section>
+
+    <section id="tab-menu" class="tab-panel" hidden>
+      <h2>Menú semanal</h2>
+      <div class="semana-nav">
+        <button type="button" class="btn-ghost btn-small" data-mover="-1" title="Semana anterior"><svg class="ic"><use href="#i-izq"/></svg></button>
+        <div class="semana-nav-centro">
+          <span class="semana-etiqueta"></span>
+          <input type="date" id="week-start" title="Ir a la semana de esta fecha" />
+        </div>
+        <button type="button" class="btn-ghost btn-small" data-mover="1" title="Semana siguiente"><svg class="ic"><use href="#i-der"/></svg></button>
+        <button type="button" class="btn-ghost btn-small" data-mover="0">Esta semana</button>
+      </div>
+      <div class="menu-actions">
+        <button id="btn-generar" class="btn-primary"><svg class="ic"><use href="#i-destellos"/></svg> Generar menú</button>
+        <button id="btn-imprimir" type="button" class="btn-ghost"><svg class="ic"><use href="#i-imprimir"/></svg> Imprimir</button>
+      </div>
+
+      <div id="menu-resumen" class="quota-summary" hidden></div>
+      <div id="menu-avisos" class="banner banner-warning" hidden></div>
+
+      <details id="menu-escolar-box">
+        <summary><svg class="ic"><use href="#i-cole"/></svg> Menú escolar de esta semana</summary>
+        <p class="hint">Primer plato, segundo y postre del cole cada día. El generador evita repetir en casa las mismas categorías.</p>
+        <p class="hint">Con el PDF del cole se guardan de golpe todas las semanas que traiga (normalmente el mes entero); luego te mueves entre semanas con las flechas. Revisa y corrige lo que haga falta. Con una foto solo se muestra el texto leído.</p>
+        <input type="file" id="escolar-foto" accept="image/*,application/pdf" hidden />
+        <button type="button" id="btn-importar-foto" class="btn-ghost btn-small"><svg class="ic"><use href="#i-archivo"/></svg> Importar PDF o foto del menú escolar</button>
+        <pre id="escolar-ocr-resultado" class="ocr-resultado" hidden></pre>
+        <div id="menu-escolar-grid" class="escolar-lista"></div>
+      </details>
+
+      <div id="menu-dias-tira" class="dias-tira"></div>
+      <div id="menu-grid" class="menu-semana-grid"></div>
+    </section>
+
+    <section id="tab-platos" class="tab-panel" hidden>
+      <h2>Recetas</h2>
+      <div id="panel-plato" class="panel-nuevo" hidden>
+        <div class="panel-nuevo-cabecera">
+          <h3 id="panel-plato-titulo">Nueva receta</h3>
+          <button type="button" class="btn-ghost btn-icono" data-cerrar-panel="panel-plato" title="Cerrar" aria-label="Cerrar"><svg class="ic"><use href="#i-cerrar"/></svg></button>
+        </div>
+      <details id="importar-receta" class="importar-receta">
+        <summary><svg class="ic"><use href="#i-enlace"/></svg> Importar receta de una web o pegando el texto</summary>
+        <div class="importar-fila">
+          <input type="url" id="importar-url" placeholder="Enlace de la receta (Directo al Paladar, recetasgratis…)" />
+          <button type="button" id="btn-importar-url" class="btn-primary btn-small">Importar</button>
+        </div>
+        <p class="hint">Desde el móvil también puedes, en la página de la receta, pulsar Compartir → Fame. Si una web no se deja, copia el texto de la receta (título, ingredientes y pasos) y pégalo aquí:</p>
+        <textarea id="importar-texto" rows="6" placeholder="Lentejas estofadas&#10;Ingredientes&#10;- 400 g de lentejas&#10;- 2 dientes de ajo&#10;Preparación&#10;1. Picamos el ajo…"></textarea>
+        <button type="button" id="btn-importar-texto" class="btn-ghost btn-small">Procesar texto</button>
+      </details>
+      <form id="form-plato">
+        <input type="hidden" id="plato-id" />
+        <input type="hidden" id="plato-fuente" />
+        <div class="form-row">
+          <input type="text" id="plato-nombre" placeholder="Nombre del plato" required />
+          <select id="plato-categoria" required>
+            <option value="">Categoría…</option>
+            <option value="legumbre">🫘 Legumbre</option>
+            <option value="pescado">🐟 Pescado</option>
+            <option value="carne">🥩 Carne</option>
+            <option value="pasta">🍝 Pasta</option>
+            <option value="arroz">🍚 Arroz</option>
+            <option value="verdura">🥦 Verdura</option>
+            <option value="huevo">🥚 Huevo</option>
+            <option value="ensalada">🥗 Ensalada</option>
+            <option value="otro">🍽️ Otro</option>
+            <option value="fruta">🍎 Fruta</option>
+            <option value="lacteo">🥛 Lácteo</option>
+            <option value="postre">🍮 Dulce</option>
+          </select>
+          <select id="plato-curso" title="Se sirve como">
+            <option value="primero">Se sirve como: 1º plato</option>
+            <option value="segundo">Se sirve como: 2º plato</option>
+            <option value="postre">Se sirve como: Postre</option>
+          </select>
+          <select id="plato-tiempo">
+            <option value="rapido">Rápido (&lt; 20 min)</option>
+            <option value="normal" selected>Tiempo normal</option>
+            <option value="largo">Largo / fin de semana</option>
+          </select>
+        </div>
+
+        <label class="checkbox-inline"><input type="checkbox" id="plato-favorito" /> Favorito <span class="hint">(el generador lo prioriza un poco)</span></label>
+
+        <div class="form-group">
+          <label class="form-group-label">Ingredientes</label>
+          <div id="ingredientes-list" class="dynamic-list"></div>
+          <button type="button" id="btn-add-ingrediente" class="btn-ghost btn-small"><svg class="ic"><use href="#i-mas"/></svg> Añadir ingrediente</button>
+          <datalist id="alimentos-conocidos"></datalist>
+        </div>
+
+        <div class="form-group">
+          <label class="form-group-label">Pasos de la receta</label>
+          <div id="pasos-list" class="dynamic-list"></div>
+          <button type="button" id="btn-add-paso" class="btn-ghost btn-small"><svg class="ic"><use href="#i-mas"/></svg> Añadir paso</button>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Guardar receta</button>
+          <button type="button" id="btn-cancelar-edicion" class="btn-ghost" hidden>Cancelar edición</button>
+        </div>
+      </form>
+      </div>
+
+      <div class="platos-toolbar">
+        <label class="buscador"><svg class="ic"><use href="#i-buscar"/></svg><input type="search" id="filtro-platos" placeholder="Buscar receta…" /></label>
+      </div>
+      <div id="filtro-categoria-chips" class="filtro-chips"></div>
+      <div id="lista-platos"></div>
+      <button type="button" class="fab" data-panel="panel-plato" title="Nueva receta" aria-label="Nueva receta"><svg class="ic"><use href="#i-mas"/></svg></button>
+    </section>
+
+    <section id="tab-config" class="tab-panel" hidden>
+      <h2>Restricciones del generador</h2>
+      <form id="form-config">
+        <fieldset>
+          <legend>Reglas por categoría</legend>
+          <p class="hint">Cuántas veces por semana debe (mínimo) o puede como mucho (máximo) aparecer cada categoría. Deja vacío lo que no aplique.</p>
+          <div id="reglas-list" class="dynamic-list"></div>
+          <button type="button" id="btn-add-regla" class="btn-ghost btn-small"><svg class="ic"><use href="#i-mas"/></svg> Añadir regla</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>Criterios del menú</legend>
+          <label class="criterio">
+            <input type="checkbox" id="cfg-comida-como-cole" />
+            <span><strong>La comida en casa se parece a la del cole</strong>
+              <small class="hint">Preferencia: cada plato de la misma categoría que el del cole ese día (legumbre, pescado…).</small></span>
+          </label>
+          <label class="criterio">
+            <input type="checkbox" id="cfg-cena-complementaria" />
+            <span><strong>La cena complementa lo comido a mediodía</strong>
+              <small class="hint">Regla: tras legumbre, pasta o arroz, verdura o ensalada; tras verdura, hidratos o legumbre; carne, pescado y huevo se alternan; tras fruta, fruta o lácteo. Mediodía es el menú del cole si lo hay; si no, la comida de casa.</small></span>
+          </label>
+          <label class="criterio">
+            <input type="checkbox" id="cfg-cenas-rapidas" />
+            <span><strong>Cenas rápidas</strong>
+              <small class="hint">Preferencia: platos marcados como «Rápido» y, si no hay, evita los «Largo».</small></span>
+          </label>
+        </fieldset>
+
+        <label>No repetir el mismo plato antes de (semanas)
+          <input type="number" id="cfg-semanas-sin-repetir" min="0" max="12" value="3" />
+        </label>
+
+        <fieldset>
+          <legend>Qué días se come en casa</legend>
+          <table class="dias-tabla" id="dias-especiales-tabla">
+            <thead>
+              <tr><th>Día</th><th>Comida</th><th>Cena</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </fieldset>
+
+        <fieldset>
+          <legend>Qué platos lleva cada comida</legend>
+          <table class="dias-tabla" id="estructura-tabla">
+            <thead>
+              <tr><th></th><th>1º</th><th>2º</th><th>Postre</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Comida</td>
+                <td><input type="checkbox" data-comida="comida" data-curso="primero" /></td>
+                <td><input type="checkbox" data-comida="comida" data-curso="segundo" /></td>
+                <td><input type="checkbox" data-comida="comida" data-curso="postre" /></td>
+              </tr>
+              <tr>
+                <td>Cena</td>
+                <td><input type="checkbox" data-comida="cena" data-curso="primero" /></td>
+                <td><input type="checkbox" data-comida="cena" data-curso="segundo" /></td>
+                <td><input type="checkbox" data-comida="cena" data-curso="postre" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </fieldset>
+
+        <button type="submit" class="btn-primary">Guardar restricciones</button>
+      </form>
+    </section>
+
+    <section id="tab-inventario" class="tab-panel" hidden>
+      <h2>Despensa</h2>
+      <div id="panel-inventario" class="panel-nuevo" hidden>
+        <div class="panel-nuevo-cabecera">
+          <h3 id="panel-inventario-titulo">Añadir a la despensa</h3>
+          <button type="button" class="btn-ghost btn-icono" data-cerrar-panel="panel-inventario" title="Cerrar" aria-label="Cerrar"><svg class="ic"><use href="#i-cerrar"/></svg></button>
+        </div>
+      <form id="form-inventario">
+        <input type="hidden" id="inv-id" />
+        <input type="hidden" id="inv-codigo" />
+        <div class="form-row">
+          <input type="text" id="inv-nombre" placeholder="Nombre del producto" list="alimentos-conocidos" required />
+          <input type="number" id="inv-cantidad" placeholder="Cantidad" min="0" step="0.1" />
+          <input type="text" id="inv-unidad" placeholder="Unidad (g, ud, botes…)" />
+        </div>
+        <div class="form-row">
+          <select id="inv-ubicacion">
+            <option value="nevera">Nevera</option>
+            <option value="congelador">Congelador</option>
+            <option value="despensa">Despensa</option>
+          </select>
+          <input type="text" id="inv-detalle" placeholder="Dónde exactamente (ej. balda 2, cajón verduras)…" />
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Guardar</button>
+          <button type="button" id="btn-escanear" class="btn-ghost"><svg class="ic"><use href="#i-escanear"/></svg> Escanear código</button>
+          <button type="button" id="btn-foto-alimento" class="btn-ghost"><svg class="ic"><use href="#i-camara"/></svg> Reconocer con foto</button>
+          <input type="file" id="foto-alimento-input" accept="image/*" capture="environment" hidden />
+          <button type="button" id="btn-cancelar-inventario" class="btn-ghost" hidden>Cancelar edición</button>
+        </div>
+      </form>
+      </div>
+
+      <div class="platos-toolbar">
+        <label class="buscador"><svg class="ic"><use href="#i-buscar"/></svg><input type="search" id="filtro-inventario" placeholder="Buscar en la despensa…" /></label>
+        <div class="segmentado" role="group" aria-label="Agrupar inventario">
+          <button type="button" data-agrupar="ubicacion" class="active">Por ubicación</button>
+          <button type="button" data-agrupar="categoria">Por categoría</button>
+        </div>
+      </div>
+      <div id="lista-inventario"></div>
+      <button type="button" class="fab" data-panel="panel-inventario" title="Añadir a la despensa" aria-label="Añadir a la despensa"><svg class="ic"><use href="#i-mas"/></svg></button>
+    </section>
+
+    <section id="tab-compra" class="tab-panel" hidden>
+      <h2>Lista de la compra</h2>
+      <div class="semana-nav">
+        <button type="button" class="btn-ghost btn-small" data-mover="-1" title="Semana anterior"><svg class="ic"><use href="#i-izq"/></svg></button>
+        <div class="semana-nav-centro">
+          <span class="semana-etiqueta"></span>
+          <input type="date" id="compra-week-start" title="Ir a la semana de esta fecha" />
+        </div>
+        <button type="button" class="btn-ghost btn-small" data-mover="1" title="Semana siguiente"><svg class="ic"><use href="#i-der"/></svg></button>
+        <button type="button" class="btn-ghost btn-small" data-mover="0">Esta semana</button>
+      </div>
+      <div class="menu-actions">
+        <button id="btn-recalcular-compra" type="button" class="btn-primary"><svg class="ic"><use href="#i-recargar"/></svg> Recalcular desde el menú</button>
+      </div>
+      <div class="compra-tienda">
+        <span class="hint">Buscar online en</span>
+        <div class="segmentado" role="group" aria-label="Supermercado online">
+          <button type="button" data-tienda="">Ninguno</button>
+          <button type="button" data-tienda="mercadona">Mercadona</button>
+          <button type="button" data-tienda="dia">DIA</button>
+        </div>
+      </div>
+      <div id="mercadona-panel" class="merc-panel" hidden></div>
+      <p class="hint">Suma los ingredientes de los platos de la semana (un mismo alimento sale una sola vez aunque aparezca en varios platos o escrito distinto) y resta lo que ya tienes en la despensa. Agrupada por secciones del súper; si algo está en la sección equivocada, cámbialo con su desplegable y lo recordará.</p>
+
+      <form id="form-extra-compra" class="ingrediente-row">
+        <input type="text" id="extra-nombre" placeholder="Añadir algo que no sea del menú…" list="alimentos-conocidos" />
+        <input type="number" id="extra-cantidad" placeholder="Cant." min="0" step="0.1" />
+        <input type="text" id="extra-unidad" placeholder="Unidad" />
+        <button type="submit" class="btn-ghost"><svg class="ic"><use href="#i-mas"/></svg> Añadir</button>
+      </form>
+
+      <div id="lista-compra-contenido"></div>
+    </section>
+  </main>
+
+  <div id="toast-container" aria-live="polite"></div>
+
+  <div id="confirm-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <p id="confirm-modal-message"></p>
+      <div class="modal-actions">
+        <button id="confirm-modal-no" class="btn-ghost">Cancelar</button>
+        <button id="confirm-modal-yes" class="btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="barcode-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <p>Apunta la cámara al código de barras</p>
+      <div id="barcode-reader"></div>
+      <div class="modal-actions">
+        <button id="barcode-cancelar" class="btn-ghost">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="foto-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h3 class="modal-titulo">Alimentos en la foto</h3>
+      <p id="foto-estado" class="hint"></p>
+      <div id="foto-resultados" class="foto-resultados"></div>
+      <label id="foto-ubicacion-fila" class="foto-ubicacion" hidden>Guardar en
+        <select id="foto-ubicacion">
+          <option value="nevera">Nevera</option>
+          <option value="despensa">Despensa</option>
+          <option value="congelador">Congelador</option>
+        </select>
+      </label>
+      <div class="modal-actions">
+        <button id="foto-cancelar" class="btn-ghost">Cancelar</button>
+        <button id="foto-reintentar" class="btn-ghost" hidden>Reintentar</button>
+        <button id="foto-guardar" class="btn-primary" disabled>Añadir a la despensa</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="receta-modal" class="modal-overlay" hidden>
+    <div class="modal-card receta-modal-card" role="dialog" aria-modal="true" aria-labelledby="receta-modal-titulo">
+      <div id="receta-modal-contenido"></div>
+      <div class="modal-actions">
+        <button id="receta-modal-editar" class="btn-ghost"><svg class="ic"><use href="#i-lapiz"/></svg> Editar</button>
+        <button id="receta-modal-cerrar" class="btn-primary">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modo-compra" class="modal-overlay" hidden>
+    <div class="modal-card mc-card" id="modo-compra-card"></div>
+  </div>
+
+  <div id="mercadona-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h3 class="modal-titulo" id="merc-modal-titulo">Elegir producto</h3>
+      <label class="buscador"><svg class="ic"><use href="#i-buscar"/></svg><input type="search" id="merc-buscar" placeholder="Buscar en Mercadona…" /></label>
+      <p id="merc-falta" class="hint"></p>
+      <div id="merc-resultados" class="merc-resultados"></div>
+      <div class="modal-actions">
+        <button id="merc-quitar" class="btn-ghost" hidden>Quitar producto</button>
+        <button id="merc-cancelar" class="btn-ghost">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
