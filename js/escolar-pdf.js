@@ -7,6 +7,10 @@
 // - Semanas: franjas verticales entre dos filas de "Kcal" consecutivas (cada
 //   semana termina con su fila de valores nutricionales). No se usa el orden
 //   del texto en el PDF porque no coincide con el orden visual de la tabla.
+// - Alérgenos: algunos meses llevan detrás de cada plato sus códigos
+//   ("Lentejas 1T", "Fruta y Pan 1-6T-10T-11") y una leyenda en el margen; los
+//   códigos se quitan y un número suelto solo es el día si va al principio del
+//   recuadro, no detrás de un plato.
 
 export const DIAS_ESCOLAR = ["lunes", "martes", "miercoles", "jueves", "viernes"];
 
@@ -14,10 +18,10 @@ const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "
 
 const PALABRAS_CATEGORIA = {
   legumbre: ["lenteja", "garbanzo", "alubia", "judion", "fabada", "potaje", "cocido"],
-  pescado: ["merluza", "salmon", "atun", "caballa", "palometa", "pescado", "bacalao", "lenguado", "trucha", "fogonero", "dorada", "gallo", "rape", "abadejo", "calamar", "sardina"],
+  pescado: ["merluza", "salmon", "atun", "caballa", "palometa", "pescado", "bacalao", "lenguado", "trucha", "fogonero", "dorada", "gallo", "gallineta", "rape", "abadejo", "calamar", "sardina", "pescadilla"],
   carne: ["pollo", "ternera", "cerdo", "lomo", "pavo", "carne", "albondiga", "jamon", "muslito", "filete", "picadillo", "salchicha", "hamburguesa", "cinta"],
   huevo: ["huevo", "tortilla", "revuelto"],
-  pasta: ["pasta", "macarron", "espagueti", "canelon", "lasagna", "lasana", "raviol", "fideo", "estrellitas", "tallarin"],
+  pasta: ["pasta", "macarron", "espagueti", "espaguet", "canelon", "lasagna", "lasana", "raviol", "fideo", "estrellitas", "tallarin"],
   arroz: ["arroz", "paella", "risotto", "rissotto"],
   ensalada: ["ensalada"],
   verdura: ["verdura", "judias verdes", "judia verde", "guisante", "coliflor", "brocoli", "espinaca", "calabacin", "repollo", "zanahoria", "acelga", "menestra", "puerro", "berenjena", "vegetal", "crema", "pure", "patata", "gazpacho", "salmorejo"],
@@ -30,6 +34,14 @@ const PRIORIDAD = ["legumbre", "arroz", "pasta", "pescado", "carne", "huevo", "e
 
 // Se comprueban antes que "legumbre" para no confundirlas con alubias.
 const SIEMPRE_VERDURA = ["judias verdes", "judia verde"];
+
+// Expresiones que contienen una palabra clave pero no son ese alimento
+// ("pico de gallo" es una salsa, no el pescado gallo); se quitan antes de buscar.
+const NO_SON_ALIMENTO = ["pico de gallo"];
+
+// Si el nombre empieza por un plato de huevo, la base es el huevo aunque lleve
+// algo más ("Huevos revueltos con taquitos de pavo", "Tortilla de atún").
+const EMPIEZA_POR_HUEVO = ["huevo", "tortilla", "revuelto"];
 
 const PALABRAS_POSTRE = {
   fruta: ["fruta", "manzana", "platano", "naranja", "pera", "melon", "sandia", "mandarina", "kiwi"],
@@ -46,9 +58,11 @@ export function normalizar(str) {
 }
 
 export function categorizarPlato(nombre) {
-  const norm = normalizar(nombre);
+  let norm = normalizar(nombre);
   if (!norm) return "";
+  for (const expr of NO_SON_ALIMENTO) norm = norm.replace(expr, " ");
   if (SIEMPRE_VERDURA.some((p) => norm.includes(p))) return "verdura";
+  if (EMPIEZA_POR_HUEVO.some((p) => norm.startsWith(p))) return "huevo";
   for (const cat of PRIORIDAD) {
     if (PALABRAS_CATEGORIA[cat].some((p) => norm.includes(p))) return cat;
   }
@@ -143,6 +157,16 @@ function detectarMesAnio(paginas) {
   return { mes, anio: Number(m[2]) };
 }
 
+// Códigos de alérgenos al final de un texto: "1T", "4-12", "1-6T-10T-11"…
+const ALERGENOS_AL_FINAL = /(?:\s+\d{1,2}T?(?:-\d{1,2}T?)*)+$/;
+const SOLO_ALERGENOS = /^\d{1,2}T?(?:-\d{1,2}T?)*$/;
+
+function quitarAlergenos(texto) {
+  const limpio = texto.trim();
+  if (SOLO_ALERGENOS.test(limpio)) return "";
+  return limpio.replace(ALERGENOS_AL_FINAL, "").trim();
+}
+
 function columnaMasCercana(columnas, x, maxDist = 120) {
   let mejor = null;
   let mejorDist = Infinity;
@@ -181,8 +205,27 @@ const DISTANCIA_MAX_AL_NUMERO = 40;
 function celdasDeColumna(items) {
   const ysKcal = items.filter((i) => /^kcal/i.test(i.str)).map((i) => i.y);
   const enFilaKcal = (i) => ysKcal.some((y) => Math.abs(y - i.y) <= 2);
-  const numeros = items.filter((i) => /^\d{1,2}$/.test(i.str) && !enFilaKcal(i));
-  const textos = items.filter((i) => !/^\d{1,2}$/.test(i.str) && !enFilaKcal(i));
+  const sinKcal = items.filter((i) => !enFilaKcal(i));
+
+  // Borde izquierdo de los recuadros: donde se repiten los números de día (todos
+  // a la misma distancia del margen). Lo que queda más a la izquierda son
+  // restos que sobresalen de la columna anterior (p. ej. un código de alérgeno
+  // al final de un plato largo) y se descarta.
+  const sueltos = sinKcal.filter((i) => /^\d{1,2}$/.test(i.str));
+  const borde = sueltos.reduce(
+    (mejor, n) => {
+      const juntos = sueltos.filter((o) => Math.abs(o.x - n.x) <= 6).length;
+      return juntos > mejor.juntos || (juntos === mejor.juntos && n.x < mejor.x) ? { x: n.x, juntos } : mejor;
+    },
+    { x: -Infinity, juntos: 0 }
+  );
+  const utiles = sinKcal.filter((i) => i.x >= borde.x - 6);
+
+  // Número del día: en ese borde y sin un texto delante en su misma línea (un
+  // código de alérgeno que cayera ahí iría detrás del nombre del plato).
+  const detrasDeTexto = (n) => utiles.some((o) => o !== n && Math.abs(o.y - n.y) <= 2 && o.x < n.x && /\D/.test(o.str));
+  const numeros = sueltos.filter((n) => Math.abs(n.x - borde.x) <= 6 && !detrasDeTexto(n));
+  const textos = utiles.filter((i) => !numeros.includes(i));
   const celdas = numeros.map((n) => ({ dia: Number(n.str), y: n.y, lineas: [] }));
 
   for (const linea of agruparEnLineas(textos)) {
@@ -199,7 +242,14 @@ function celdasDeColumna(items) {
     if (mejor && mejorDist <= DISTANCIA_MAX_AL_NUMERO) mejor.lineas.push(linea);
   }
 
-  return celdas.map((c) => ({ dia: c.dia, y: c.y, lineas: c.lineas.sort((a, b) => b.y - a.y).map((l) => l.texto) }));
+  return celdas.map((c) => ({
+    dia: c.dia,
+    y: c.y,
+    lineas: c.lineas
+      .sort((a, b) => b.y - a.y)
+      .map((l) => quitarAlergenos(l.texto))
+      .filter(Boolean),
+  }));
 }
 
 function aISO(fecha) {
@@ -274,8 +324,12 @@ export function parsearMenuEscolar(paginas) {
     if (!columnas) return;
 
     const cuerpo = visibles.filter((i) => i.y < yCabecera - 1);
+    // Un texto pertenece a una columna si está a menos de media columna de su
+    // cabecera; lo que queda más lejos (leyendas en el margen) no es de ninguna.
+    const xs = Object.values(columnas).sort((a, b) => a - b);
+    const anchoColumna = xs.length > 1 ? (xs[xs.length - 1] - xs[0]) / (xs.length - 1) : 150;
     for (const clave of Object.keys(columnas)) {
-      const enColumna = cuerpo.filter((i) => columnaMasCercana(columnas, i.x) === clave);
+      const enColumna = cuerpo.filter((i) => columnaMasCercana(columnas, i.x, anchoColumna * 0.6) === clave);
       for (const celda of celdasDeColumna(enColumna)) celdas.push({ clave, pagina, ...celda });
     }
   });
