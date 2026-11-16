@@ -19,6 +19,7 @@ import {
 } from "./db.js";
 import {
   generarMenu,
+  regenerarPlato,
   DIAS,
   COMIDAS,
   CURSOS,
@@ -512,8 +513,11 @@ function bloqueCasaHTML(dia, comida, datosComida, editable) {
     const id = datosComida?.[curso];
     if (id) {
       const plato = platosCache.find((p) => p.id === id);
-      const quitar = editable ? `<button type="button" class="btn-quitar-plato" ${datosAttr(curso)} title="Quitar">×</button>` : "";
-      return lineaPlatoHTML(curso, nombreConIcono(plato?.categoria, plato ? plato.nombre : "(plato borrado)"), quitar);
+      const botones = editable
+        ? `<button type="button" class="btn-regenerar-plato" ${datosAttr(curso)} title="Otra receta (cumpliendo las reglas)" aria-label="Otra receta">${icono("recargar")}</button>` +
+          `<button type="button" class="btn-quitar-plato" ${datosAttr(curso)} title="Quitar">×</button>`
+        : "";
+      return lineaPlatoHTML(curso, nombreConIcono(plato?.categoria, plato ? plato.nombre : "(plato borrado)") + (plato?.revisar ? AVISO_REVISAR_CORTO : ""), botones);
     }
     if (!editable) return lineaPlatoHTML(curso, '<span class="hint">—</span>');
     return lineaPlatoHTML(curso, `<select class="select-add-plato" ${datosAttr(curso)}>${opcionesPlatoParaCurso(curso)}</select>`);
@@ -567,6 +571,10 @@ async function renderHoy() {
     : `<h3 class="hoy-recetas-titulo">Recetas de hoy</h3>${recetas.join("")}`);
 }
 
+// Aviso de las recetas marcadas como "Necesita revisión".
+const AVISO_REVISAR = `<p class="aviso-revisar"><strong>Receta pendiente de revisión.</strong> Comprueba los ingredientes y los pasos antes de cocinar.</p>`;
+const AVISO_REVISAR_CORTO = `<span class="marca-revisar" title="Receta pendiente de revisión">revisar</span>`;
+
 // Cada receta del día es una tarjeta plegable: a la vista solo el plato, y al
 // tocarla se despliegan ingredientes y pasos.
 function renderRecetaBloque(comida, plato, curso) {
@@ -579,10 +587,11 @@ function renderRecetaBloque(comida, plato, curso) {
       <summary>
         <div class="receta-resumen">
           <p class="comida-label">${etiqueta}</p>
-          <h3>${CATEGORIA_ICONO[plato.categoria] || ""} ${escapeHTML(plato.nombre)}</h3>
+          <h3>${CATEGORIA_ICONO[plato.categoria] || ""} ${escapeHTML(plato.nombre)}${plato.revisar ? AVISO_REVISAR_CORTO : ""}</h3>
         </div>
       </summary>
       <div class="receta-cuerpo">
+        ${plato.revisar ? AVISO_REVISAR : ""}
         ${ingredientes ? `<h4>Ingredientes</h4><ul class="ingredientes-chips">${ingredientes}</ul>` : ""}
         ${pasos ? `<h4>Preparación</h4><ol class="receta-pasos">${pasos}</ol>` : ""}
         ${!ingredientes && !pasos ? `<p class="hint">Este plato aún no tiene receta.</p>` : ""}
@@ -681,6 +690,7 @@ function initFormPlato() {
       tiempoPrep: document.getElementById("plato-tiempo").value,
       fuente: document.getElementById("plato-fuente").value,
       favorito: document.getElementById("plato-favorito").checked,
+      revisar: document.getElementById("plato-revisar").checked,
       ingredientes,
       pasos: leerPasos(),
     };
@@ -712,6 +722,7 @@ function resetFormPlato() {
   document.getElementById("plato-id").value = "";
   document.getElementById("plato-fuente").value = "";
   document.getElementById("plato-favorito").checked = false;
+  document.getElementById("plato-revisar").checked = false;
   document.getElementById("plato-curso").dataset.manual = "";
   document.getElementById("btn-cancelar-edicion").hidden = true;
   resetIngredientes();
@@ -765,7 +776,7 @@ function renderPlatosList() {
       li.innerHTML = `
         <button type="button" class="plato-abrir" title="Ver receta">
           <strong>${escapeHTML(plato.nombre)}</strong>
-          <span class="plato-meta hint">${CURSO_NOMBRE[cursoDePlato(plato)]} · ${TIEMPO_LABEL[plato.tiempoPrep] || TIEMPO_LABEL.normal}${sinReceta ? " · sin receta" : ""}</span>
+          <span class="plato-meta hint">${CURSO_NOMBRE[cursoDePlato(plato)]} · ${TIEMPO_LABEL[plato.tiempoPrep] || TIEMPO_LABEL.normal}${sinReceta ? " · sin receta" : ""}${plato.revisar ? AVISO_REVISAR_CORTO : ""}</span>
         </button>
         <div class="plato-actions">
           <button data-action="favorito" class="${plato.favorito ? "fav-activo" : ""}" title="${plato.favorito ? "Quitar de favoritos" : "Marcar como favorito"}">${icono("estrella")}</button>
@@ -807,6 +818,7 @@ function abrirReceta(plato) {
   document.getElementById("receta-modal-contenido").innerHTML = `
     <p class="hint receta-modal-meta">${meta.filter(Boolean).join(" · ")}${plato.favorito ? ` · <span class="fav-activo">${icono("estrella")}</span> Favorito` : ""}</p>
     <h3 id="receta-modal-titulo" class="receta-modal-titulo">${escapeHTML(plato.nombre)}</h3>
+    ${plato.revisar ? AVISO_REVISAR : ""}
     ${ingredientes ? `<h4>Ingredientes</h4><ul class="ingredientes-chips">${ingredientes}</ul>` : ""}
     ${pasos ? `<h4>Preparación</h4><ol class="receta-pasos">${pasos}</ol>` : ""}
     ${!ingredientes && !pasos ? `<p class="hint">Este plato aún no tiene receta. Pulsa «Editar» para añadir los ingredientes y los pasos.</p>` : ""}
@@ -846,6 +858,7 @@ function cargarPlatoEnForm(plato) {
   document.getElementById("plato-tiempo").value = plato.tiempoPrep || "normal";
   document.getElementById("plato-fuente").value = plato.fuente || "";
   document.getElementById("plato-favorito").checked = !!plato.favorito;
+  document.getElementById("plato-revisar").checked = !!plato.revisar;
   resetIngredientes(plato.ingredientes || []);
   resetPasos(plato.pasos || []);
   document.getElementById("btn-cancelar-edicion").hidden = false;
@@ -1296,6 +1309,9 @@ function renderMenuGrid() {
   [...grid.children].slice(4).forEach((celda, i) => (celda.dataset.dia = DIAS[Math.floor(i / 4)]));
   renderTiraDias();
 
+  grid.querySelectorAll(".btn-regenerar-plato").forEach((btn) => {
+    btn.addEventListener("click", () => regenerarHueco(btn, btn.dataset.dia, btn.dataset.comida, btn.dataset.curso));
+  });
   grid.querySelectorAll(".btn-quitar-plato").forEach((btn) => {
     btn.addEventListener("click", () => ponerPlato(btn.dataset.dia, btn.dataset.comida, btn.dataset.curso, null));
   });
@@ -1333,6 +1349,30 @@ async function ponerPlato(dia, comida, curso, platoId) {
   await persistirMenuActual();
   renderMenuGrid();
   renderResumenCuotas(menuActualDias);
+}
+
+// Cambia un solo plato por otro que cumpla las mismas reglas que el
+// generador, teniendo en cuenta el resto del menú de la semana.
+async function regenerarHueco(boton, dia, comida, curso) {
+  boton.disabled = true;
+  boton.classList.add("girando");
+  try {
+    if (!restriccionesCache) restriccionesCache = restriccionesPorDefecto();
+    const semanaId = document.getElementById("week-start").value || toISO(mondayOf(new Date()));
+    const historial = await historialDePlatos(semanaId, Math.max(8, restriccionesCache.semanasSinRepetir ?? 3));
+    const { platoId, avisos } = regenerarPlato(platosCache, restriccionesCache, leerMenuEscolar(), semanaId, historial, menuActualDias, { dia, comida, curso });
+    if (!platoId) {
+      showToast("No hay otra receta de ese tipo en el catálogo.", "error");
+      return;
+    }
+    await ponerPlato(dia, comida, curso, platoId);
+    const nombre = platosCache.find((p) => p.id === platoId)?.nombre || "";
+    if (avisos.length) showToast(`Cambiado por «${nombre}». ${avisos.join(" ")}`, "info");
+    else showToast(`Cambiado por «${nombre}».`, "success");
+  } finally {
+    boton.disabled = false;
+    boton.classList.remove("girando");
+  }
 }
 
 function renderResumenCuotas(dias) {
